@@ -1,5 +1,9 @@
 # gas-p — Agent Guidelines
 
+## Issue Tracking
+
+Issues are on GitHub at **https://github.com/evinle/gas-p/issues**. When the user refers to an issue by number (e.g. "#3"), look it up there.
+
 ## TypeScript
 
 - **No type assertions.** Never use `as SomeType`. Instead, write explicit guard functions that test for the presence and shape of properties at runtime. Guards must check both key existence AND value type — `'key' in x` alone is not sufficient; follow with `typeof x.key === 'string'` (or the appropriate type check). TypeScript narrows correctly after `in` checks, so chained guards require no assertions.
