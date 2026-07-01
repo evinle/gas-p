@@ -12,6 +12,21 @@ Issues are on GitHub at **https://github.com/evinle/gas-p/issues**. When the use
 
 - **Use fixture files for known-good inputs.** For happy-path tests that exercise parsing or reading, write static fixture files to `src/__tests__/__fixtures__/` and reference them by path. This avoids untested custom helpers and makes the expected input explicit and reviewable. Only use inline `fs.writeFileSync` (not helper wrappers) for error-case inputs that need to be malformed or missing specific fields.
 
+## Local Development Pattern
+
+The intended usage pattern for `gas-p` is:
+
+```ts
+// local/run.ts
+import { run } from 'gas-p';
+import { sendWeeklyReport, updateSheet } from '../src/Code.js';
+
+// Swap out which function you want to debug
+run(sendWeeklyReport);
+```
+
+Run with `npx tsx local/run.ts`. The GAS source (`Code.ts`) never imports from gas-p — it uses `CalendarApp`, `Logger`, etc. as globals. `run()` injects shims into `globalThis` before calling the function, so GAS source is completely unmodified. All local-runnable functions live in one file; the developer just swaps the argument to `run()` to switch what they're debugging.
+
 ## Architecture
 
 - **Functional, not stateful.** Prefer functions that take data in and return data out over functions that mutate shared objects as a side effect. Keeps each function independently testable and the call site readable as a pipeline.

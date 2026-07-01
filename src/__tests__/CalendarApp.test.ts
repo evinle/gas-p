@@ -1,0 +1,104 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { execFileSync } from 'child_process';
+
+vi.mock('child_process', () => ({
+  execFileSync: vi.fn(),
+}));
+
+const mockExecFileSync = vi.mocked(execFileSync);
+
+const START = new Date('2026-07-01T09:00:00Z');
+const END = new Date('2026-07-01T17:00:00Z');
+
+const RAW_EVENT = {
+  id: 'evt1',
+  summary: 'Team Standup',
+  start: { dateTime: '2026-07-01T10:00:00Z' },
+  end: { dateTime: '2026-07-01T10:30:00Z' },
+};
+
+const RAW_CREATED_EVENT = {
+  id: 'evt2',
+  summary: 'New Meeting',
+  start: { dateTime: '2026-07-01T14:00:00Z' },
+  end: { dateTime: '2026-07-01T15:00:00Z' },
+};
+
+beforeEach(() => { vi.resetAllMocks(); });
+
+describe('CalendarApp.getCalendarById()', () => {
+  it('returns a Calendar with getEvents and createEvent methods', async () => {
+    const { createCalendarApp } = await import('../shims/CalendarApp.js');
+    const CalendarApp = createCalendarApp('/fake/credentials.json');
+    const cal = CalendarApp.getCalendarById('cal123');
+    expect(typeof cal.getEvents).toBe('function');
+    expect(typeof cal.createEvent).toBe('function');
+  });
+});
+
+describe('Calendar.getEvents()', () => {
+  it('returns CalendarEvents from the API response', async () => {
+    mockExecFileSync.mockReturnValue(JSON.stringify([RAW_EVENT]));
+    const { createCalendarApp } = await import('../shims/CalendarApp.js');
+    const CalendarApp = createCalendarApp('/fake/credentials.json');
+    const events = CalendarApp.getCalendarById('cal123').getEvents(START, END);
+    expect(events).toHaveLength(1);
+  });
+
+  it('returns events with correct title and times', async () => {
+    mockExecFileSync.mockReturnValue(JSON.stringify([RAW_EVENT]));
+    const { createCalendarApp } = await import('../shims/CalendarApp.js');
+    const CalendarApp = createCalendarApp('/fake/credentials.json');
+    const [event] = CalendarApp.getCalendarById('cal123').getEvents(START, END);
+    expect(event.getTitle()).toBe('Team Standup');
+    expect(event.getSummary()).toBe('Team Standup');
+    expect(event.getStartTime()).toEqual(new Date('2026-07-01T10:00:00Z'));
+    expect(event.getEndTime()).toEqual(new Date('2026-07-01T10:30:00Z'));
+  });
+
+  it('fetches only once when getEvents is called multiple times', async () => {
+    mockExecFileSync.mockReturnValue(JSON.stringify([RAW_EVENT]));
+    const { createCalendarApp } = await import('../shims/CalendarApp.js');
+    const CalendarApp = createCalendarApp('/fake/credentials.json');
+    const cal = CalendarApp.getCalendarById('cal123');
+    cal.getEvents(START, END);
+    cal.getEvents(START, END);
+    expect(mockExecFileSync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Calendar.createEvent()', () => {
+  it('returns a CalendarEvent with the created event data', async () => {
+    mockExecFileSync.mockReturnValue(JSON.stringify(RAW_CREATED_EVENT));
+    const { createCalendarApp } = await import('../shims/CalendarApp.js');
+    const CalendarApp = createCalendarApp('/fake/credentials.json');
+    const event = CalendarApp.getCalendarById('cal123').createEvent(
+      'New Meeting',
+      new Date('2026-07-01T14:00:00Z'),
+      new Date('2026-07-01T15:00:00Z'),
+    );
+    expect(event.getTitle()).toBe('New Meeting');
+    expect(event.getStartTime()).toEqual(new Date('2026-07-01T14:00:00Z'));
+  });
+});
+
+describe('CalendarApp.getDefaultCalendar()', () => {
+  it('uses the primary calendar', async () => {
+    mockExecFileSync.mockReturnValue(JSON.stringify([RAW_EVENT]));
+    const { createCalendarApp } = await import('../shims/CalendarApp.js');
+    const CalendarApp = createCalendarApp('/fake/credentials.json');
+    CalendarApp.getDefaultCalendar().getEvents(START, END);
+    const script = mockExecFileSync.mock.calls[0][1] as string[];
+    expect(script).toBeDefined();
+    const input = (mockExecFileSync.mock.calls[0][2] as { input: string }).input;
+    expect(input).toContain('"primary"');
+  });
+});
+
+describe('CalendarApp unimplemented methods', () => {
+  it('getCalendarsByName throws GasPNotImplementedError', async () => {
+    const { createCalendarApp } = await import('../shims/CalendarApp.js');
+    const CalendarApp = createCalendarApp('/fake/credentials.json');
+    expect(() => CalendarApp.getCalendarsByName('foo')).toThrow('CalendarApp.getCalendarsByName() is not yet implemented');
+  });
+});
