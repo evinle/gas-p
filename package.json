@@ -1,0 +1,33 @@
+{
+  "name": "gas-p",
+  "version": "0.1.0",
+  "description": "Local development runtime for Google Apps Script TypeScript codebases",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "bin": {
+    "gas-p": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "tsx": "^4.19.4",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4",
+    "@types/node": "^22.15.29"
+  }
+}
