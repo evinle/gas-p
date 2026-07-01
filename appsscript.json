@@ -1,0 +1,4 @@
+{
+  "timeZone": "Australia/Sydney",
+  "oauthScopes": ["https://www.googleapis.com/auth/calendar"]
+}

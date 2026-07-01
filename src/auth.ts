@@ -31,8 +31,17 @@ function isGoogleCredentialsFile(x: unknown): x is GoogleCredentialsFile {
   return hasClientFields(installed);
 }
 
+function parseJsonFile(filePath: string): unknown {
+  const content = readFileSync(filePath, 'utf-8');
+  try {
+    return JSON.parse(content);
+  } catch {
+    throw new Error(`${filePath} contains invalid JSON`);
+  }
+}
+
 export function readClientSecret(secretPath: string): ClientSecret {
-  const raw: unknown = JSON.parse(readFileSync(secretPath, 'utf-8'));
+  const raw = parseJsonFile(secretPath);
   if (!isGoogleCredentialsFile(raw)) {
     throw new Error(`client_secret.json at ${secretPath} is missing required fields (client_id, client_secret)`);
   }
@@ -92,7 +101,11 @@ export interface CallbackServer {
   close: () => void;
 }
 
-export function startCallbackServer(): Promise<CallbackServer> {
+const DEFAULT_AUTH_TIMEOUT_MS = 3 * 60 * 1000;
+
+export function startCallbackServer(options?: { timeoutMs?: number }): Promise<CallbackServer> {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS;
+
   return new Promise((resolve, reject) => {
     let resolveCode: (code: string) => void;
     let rejectCode: (err: Error) => void;
@@ -119,10 +132,16 @@ export function startCallbackServer(): Promise<CallbackServer> {
         reject(new Error('Failed to start local auth server'));
         return;
       }
+
+      const timer = setTimeout(() => {
+        server.close();
+        rejectCode(new Error(`gas-p auth timed out after ${timeoutMs / 1000}s — no callback received`));
+      }, timeoutMs);
+
       resolve({
         port: address.port,
-        awaitCode: () => codePromise,
-        close: () => server.close(),
+        awaitCode: () => codePromise.finally(() => clearTimeout(timer)),
+        close: () => { clearTimeout(timer); server.close(); },
       });
     });
   });
@@ -143,7 +162,7 @@ export async function runAuthFlow(client: ClientSecret, scopes: string[]): Promi
 }
 
 export function readScopes(manifestPath: string): string[] {
-  const raw: unknown = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+  const raw = parseJsonFile(manifestPath);
   if (!isManifest(raw)) throw new Error(`appsscript.json at ${manifestPath} is missing a valid oauthScopes array`);
   return raw.oauthScopes;
 }

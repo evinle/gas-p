@@ -36,6 +36,11 @@ describe('startCallbackServer', () => {
 
     expect(code).toBe('test-auth-code');
   });
+
+  it('rejects with a timeout error when no callback arrives within timeoutMs', async () => {
+    const { awaitCode } = await startCallbackServer({ timeoutMs: 50 });
+    await expect(awaitCode()).rejects.toThrow(/timed out/);
+  });
 });
 
 describe('buildOAuth2Client', () => {
@@ -83,5 +88,13 @@ describe('readScopes', () => {
 
   it('throws when appsscript.json does not exist', () => {
     expect(() => readScopes('/nonexistent/path/appsscript.json')).toThrow();
+  });
+
+  it('throws mentioning the file path when appsscript.json is empty or invalid JSON', () => {
+    const dir = join(tmpdir(), `gas-p-test-${process.pid}-empty`);
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, 'appsscript.json');
+    writeFileSync(path, '');
+    expect(() => readScopes(path)).toThrow(path);
   });
 });
