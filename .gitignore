@@ -2,3 +2,4 @@ node_modules/
 dist/
 gas-p.properties.json
 ~/.gas-p/
+appsscript.json
