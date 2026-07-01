@@ -29,7 +29,7 @@ program
 program
   .command('auth')
   .description('Authenticate with Google APIs')
-  .option('--manifest <path>', 'Path to appsscript.json', 'appsscript.json')
+  .option('--manifest <path>', 'Path to appsscript.json', join(process.cwd(), 'appsscript.json'))
   .action(async (opts: { manifest: string }) => {
     const scopes = readScopes(opts.manifest);
     const clientSecret = readClientSecret(CLIENT_SECRET_PATH);
