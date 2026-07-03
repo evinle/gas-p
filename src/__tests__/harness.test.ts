@@ -1,33 +1,57 @@
-import { describe, it, expect, vi } from 'vitest';
-import { run } from '../index.js';
+import { describe, it, expect } from 'vitest';
+import { fileURLToPath } from 'url';
+import { join, dirname } from 'path';
+import { renderDoGet } from '../core/harness.js';
 
-vi.mock('../auth.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../auth.js')>();
-  return { ...actual, readStoredCredentials: () => null };
-});
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FIXTURES = join(__dirname, '__fixtures__', 'harness');
 
-function hasMethod(x: unknown, key: string): x is Record<string, unknown> {
-  if (typeof x !== 'object' || x === null) return false;
-  if (!(key in x)) return false;
-  return typeof Reflect.get(x, key) === 'function';
-}
-
-describe('run()', () => {
-  it('injects UrlFetchApp into global scope before calling fn', async () => {
-    let injected: unknown;
-    await run(() => { injected = Reflect.get(globalThis, 'UrlFetchApp'); });
-    expect(hasMethod(injected, 'fetch')).toBe(true);
+describe('renderDoGet', () => {
+  it('renders the HTML file returned by doGet unchanged when it has no scriptlets', () => {
+    const html = renderDoGet(join(FIXTURES, 'plain-html'));
+    expect(html).toBe(
+      ['<html>', '  <body>', '    <h1>Hello gas-p</h1>', '  </body>', '</html>', ''].join('\n')
+    );
   });
 
-  it('injects Logger into global scope before calling fn', async () => {
-    let injected: unknown;
-    await run(() => { injected = Reflect.get(globalThis, 'Logger'); });
-    expect(hasMethod(injected, 'log')).toBe(true);
+  it('HTML-escapes <?= ?> scriptlet output', () => {
+    const html = renderDoGet(join(FIXTURES, 'escaped-scriptlet'));
+    expect(html).toBe('<p>Hello, &lt;b&gt;World&lt;/b&gt;!</p>\n');
   });
 
-  it('injects CalendarApp into global scope before calling fn', async () => {
-    let injected: unknown;
-    await run(() => { injected = Reflect.get(globalThis, 'CalendarApp'); });
-    expect(hasMethod(injected, 'getCalendarById')).toBe(true);
+  it('does not escape <?!= ?> scriptlet output', () => {
+    const html = renderDoGet(join(FIXTURES, 'unescaped-scriptlet'));
+    expect(html).toBe('<p>Hello, <b>World</b>!</p>\n');
+  });
+
+  it('strips <?# ?> scriptlet comments entirely from the output', () => {
+    const html = renderDoGet(join(FIXTURES, 'comment-scriptlet'));
+    expect(html).toBe('<p>Hello, World!</p>\n');
+  });
+
+  it('does not persist module-level state across separate renderDoGet calls', () => {
+    const counterDir = join(FIXTURES, 'counter');
+    const first = renderDoGet(counterDir);
+    const second = renderDoGet(counterDir);
+    expect(first).toBe('<p>Count: 1</p>\n');
+    expect(second).toBe('<p>Count: 1</p>\n');
+  });
+
+  it('handles escaped, unescaped, and comment scriptlets together in one template', () => {
+    const html = renderDoGet(join(FIXTURES, 'combined-scriptlets'));
+    expect(html).toBe(
+      [
+        '<h1>Welcome to gas-p &amp; friends</h1>',
+        '<p>Status: <b>NEW</b></p>',
+        '',
+        '<p>Escaped again: gas-p &amp; friends</p>',
+        '',
+      ].join('\n')
+    );
+  });
+
+  it('throws a ReferenceError when doGet references an undeclared global, matching real Apps Script', () => {
+    expect(() => renderDoGet(join(FIXTURES, 'undeclared-global'))).toThrow(ReferenceError);
+    expect(() => renderDoGet(join(FIXTURES, 'undeclared-global'))).toThrow(/someUndeclaredService is not defined/);
   });
 });
