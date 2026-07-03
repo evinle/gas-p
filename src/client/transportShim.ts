@@ -6,7 +6,9 @@ interface RpcResponse {
 
 interface ScriptRunOptions {
   endpoint: string;
-  fetchImpl: (url: string, init: { method: string; body: string }) => Promise<RpcResponse>;
+  // Test-injection seam. Real callers omit this and get the real global
+  // fetch — no reason to ask production code to supply its own HTTP layer.
+  fetchImpl?: (url: string, init: { method: string; body: string }) => Promise<RpcResponse>;
 }
 
 function isRpcSuccess(x: unknown): x is { ok: true; value: unknown } {
@@ -62,6 +64,8 @@ export type ScriptRun = Record<string, (...args: unknown[]) => void> & {
 };
 
 function build(options: ScriptRunOptions, state: ChainState): ScriptRun {
+  const { endpoint, fetchImpl = fetch } = options;
+
   return new Proxy({} as ScriptRun, {
     get(_target, prop) {
       if (typeof prop !== 'string') return undefined;
@@ -76,11 +80,10 @@ function build(options: ScriptRunOptions, state: ChainState): ScriptRun {
       }
       const fnName = prop;
       return (...args: unknown[]) => {
-        options
-          .fetchImpl(options.endpoint, {
-            method: 'POST',
-            body: JSON.stringify({ fnName, args }),
-          })
+        fetchImpl(endpoint, {
+          method: 'POST',
+          body: JSON.stringify({ fnName, args }),
+        })
           .then((res) => res.json())
           .then((body: unknown) => {
             if (isRpcSuccess(body)) {

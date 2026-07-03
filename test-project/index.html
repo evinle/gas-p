@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>gas-p RPC test</title>
+  </head>
+  <body>
+    <button id="greet">Get greeting</button>
+    <p id="result"></p>
+
+    <script type="module">
+      import { installTransportShim } from 'gas-p/client';
+
+      installTransportShim({ endpoint: '/__gasp/rpc' });
+
+      document.getElementById('greet').addEventListener('click', () => {
+        google.script.run
+          .withSuccessHandler((value) => {
+            document.getElementById('result').textContent = value;
+          })
+          .withFailureHandler((error) => {
+            document.getElementById('result').textContent = 'Error: ' + error.message;
+          })
+          .getGreeting('World');
+      });
+    </script>
+  </body>
+</html>

@@ -6,9 +6,9 @@
   "engines": {
     "node": ">=22"
   },
-  "main": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js"
+    "./vite": "./dist/adapters/vitePlugin.js",
+    "./client": "./dist/client/transportShim.js"
   },
   "bin": {
     "gas-p": "./dist/cli.js"

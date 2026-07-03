@@ -89,6 +89,23 @@ describe('createScriptRun', () => {
   });
 });
 
+describe('createScriptRun default fetchImpl', () => {
+  it('falls back to the global fetch when fetchImpl is not provided', () => {
+    const globalFetch = vi.fn().mockResolvedValue(fakeResponse({ ok: true, value: 5 }));
+    vi.stubGlobal('fetch', globalFetch);
+
+    const run = createScriptRun({ endpoint: '/__gasp/rpc' });
+    run.add(2, 3);
+
+    expect(globalFetch).toHaveBeenCalledWith(
+      '/__gasp/rpc',
+      expect.objectContaining({ method: 'POST' })
+    );
+
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('installTransportShim', () => {
   it('installs google.script.run onto the target when google is undefined', () => {
     const target: Record<string, unknown> = {};
