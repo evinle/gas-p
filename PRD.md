@@ -2,129 +2,117 @@
 
 ## Problem Statement
 
-Developers writing Google Apps Script (GAS) in TypeScript cannot test or run their code locally. The GAS runtime executes exclusively on Google's servers, meaning every change requires a full deploy via clasp before it can be exercised. This makes iteration slow, debugging painful, and automated testing effectively impossible without mocking the entire GAS global surface by hand. There is no actively maintained, TypeScript-first tool that provides a local GAS runtime backed by real Google API calls.
+Developers building Google Apps Script (GAS) web apps — a `Code.gs` backend plus an HTML/JS frontend calling `google.script.run` — cannot run or hot-reload that app locally. Every change requires a deploy-to-test cycle. There is no actively maintained tool that runs the real frontend and backend together locally, backed by real Google API calls, with the same `google.script.run` call pattern the frontend already uses in production.
 
 ## Solution
 
-`gas-p` is a local development runtime for Google Apps Script TypeScript codebases. It injects shims for GAS global services (`SpreadsheetApp`, `CalendarApp`, `UrlFetchApp`, `PropertiesService`, `Logger`) into a Node.js execution context, backed by real Google API calls via the `googleapis` package. The developer's GAS source code remains completely untouched — no imports, no modifications, no coupling to gas-p. A thin local-only entry point wraps execution via `gas-p.run()`. The tool is open source, MIT licensed, and designed to be shared across the GAS developer community.
+`gas-p` is a local development server for standalone GAS web apps. Three layers, bridged over HTTP instead of GAS's postMessage:
+
+1. **Transport Shim** — a `Proxy`-based drop-in for `google.script.run` on the client. Only active when `typeof google === "undefined"` (never in production). Turns `google.script.run.someFunction(...)` into a `fetch` POST to the local backend, with the same chainable `withSuccessHandler`/`withFailureHandler`/`withUserObject` API and the same prod-parity constraints (JSON-serializable args only, `undefined` → `null`, un-awaited Promise returns, stripped error shape).
+2. **Runtime Harness** — executes the developer's real `.gs`/`.js` source in an isolated Node `vm` context, rebuilt fresh per request (no state persists across calls, matching Apps Script's per-execution model). Also evaluates `doGet(e)`'s returned `HtmlOutput` against the real HTML files, running single-file scriptlet templating (`<?= ?>`, `<?!= ?>`, `<?# ?>`).
+3. **Service Layer** — GAS service calls (`CalendarApp`, etc.) resolve through Live mode: real Google API calls via `googleapis`, bridged synchronously via a subprocess-per-call (see below). Local/fixture mode and record/replay are deferred past v1.
+
+The developer's GAS source stays completely untouched — no imports from gas-p, no `await`, no coupling. The frontend stays untouched too — it calls `google.script.run` exactly as in production.
 
 ## User Stories
 
-1. As a GAS developer, I want to run my TypeScript GAS code locally without deploying, so that I can iterate faster.
-2. As a GAS developer, I want my local run to call real Google APIs, so that I can trust the results match production behaviour.
-3. As a GAS developer, I want to authenticate gas-p once and have it persist, so that I don't re-authenticate on every run.
-4. As a GAS developer, I want gas-p to read the required OAuth scopes from my existing `appsscript.json`, so that I don't have to declare them twice.
-5. As a GAS developer, I want my GAS source code to stay untouched, so that it can still be deployed to Google without modification.
-6. As a GAS developer, I want a thin local entry point that wraps my function calls, so that I have a clear separation between GAS source and local dev tooling.
-7. As a GAS developer, I want `SpreadsheetApp` to work locally backed by the real Sheets API, so that I can test spreadsheet logic without deploying.
-8. As a GAS developer, I want `CalendarApp` to work locally backed by the real Calendar API, so that I can test calendar logic without deploying.
-9. As a GAS developer, I want `UrlFetchApp` to work locally using native Node fetch, so that my HTTP calls behave the same as in production.
-10. As a GAS developer, I want `PropertiesService` to work locally backed by a `gas-p.properties.json` file, so that I can replicate script properties without hardcoding secrets.
-11. As a GAS developer, I want to run `gas-p pull-properties` to seed my local properties file from the deployed script, so that my local environment matches production exactly.
-12. As a GAS developer, I want `gas-p.properties.json` to be gitignored by default, so that secrets are not accidentally committed.
-13. As a GAS developer, I want `Logger.log()` to output to the terminal, so that I can see logs during local execution.
-14. As a GAS developer, I want a clear `GasPNotImplementedError` when I call an unimplemented GAS method, so that I know exactly what's missing and where to request it.
-15. As a GAS developer, I want the `GasPNotImplementedError` to include a link to the GitHub issues page, so that I can easily request or contribute the missing method.
-16. As a GAS developer, I want gas-p to be a local dev dependency (`npm install -D gas-p`), so that the version is pinned per project and reproducible across my team.
-17. As a GAS developer, I want to run gas-p via `npx gas-p run local/run.ts`, so that no global install is required.
-18. As a GAS developer, I want zero TypeScript configuration for gas-p, so that I can get started without tsconfig changes.
-19. As a GAS developer, I want `gas-p.run()` to flush all queued write operations at the end of execution, so that writes are applied after all logic has run.
-20. As a GAS developer, I want resources like spreadsheets to be fetched and cached eagerly on first access, so that subsequent method calls on the same resource are fast and synchronous.
-21. As a GAS open source contributor, I want a clear pattern for implementing unimplemented stubs, so that I can contribute a new method without understanding the entire codebase.
-22. As a GAS developer, I want only standalone scripts to be supported, so that I don't have to configure a "container" document.
-23. As a GAS developer on a team, I want gas-p credentials stored in `~/.gas-p/credentials.json`, so that auth is per-user and not committed to the repo.
-24. As a GAS developer, I want gas-p to work on Node 22+, so that I can use modern Node features without polyfills.
+1. As a GAS developer, I want to run my web app's frontend and backend locally with hot reload, so that I can iterate without deploying.
+2. As a GAS developer, I want the frontend to keep calling `google.script.run` unmodified, so that local and prod code paths don't diverge.
+3. As a GAS developer, I want my local run to call real Google APIs by default, so that I can trust the results match production behavior.
+4. As a GAS developer, I want writes and reads to happen immediately, the moment my `.gs` code calls them, so local behavior matches real Apps Script instead of introducing local-only caching bugs.
+5. As a GAS developer, I want `doGet` to serve my real HTML files with scriptlet templating evaluated, so my web app's landing page works locally.
+6. As a GAS developer, I want a single `vite dev` command to run everything, so that I don't juggle separate frontend/backend processes.
+7. As a GAS developer, I want to authenticate gas-p once (browser-based OAuth2, scopes read from `appsscript.json`) and have it persist at `~/.gas-p/credentials.json`, so I don't re-authenticate on every run.
+8. As a GAS developer, I want gas-p to refuse to touch any Google resource ID I haven't explicitly declared as a dev resource, so a copy-pasted production calendar/spreadsheet ID can't get silently mutated during local dev.
+9. As a GAS developer, I want `PropertiesService` backed by a local `gas-p.properties.json` file (seeded via `gas-p pull-properties`), so I don't need a deployed script round-trip just to read/write script properties locally.
+10. As a GAS developer, I want a clear `GasPNotImplementedError` when I call an unimplemented or container-bound GAS method, so I know exactly what's missing and that container-bound APIs (`getActive*`, `getUi`, container triggers) are out of scope by design.
+11. As a GAS open source contributor, I want core (`dispatch.js`, `context.js`, `services.js`, `watcher.js`) to stay framework-agnostic, so new adapters beyond Vite are cheap to add later.
+12. As a GAS developer, I want gas-p to work on Node 22+, so I can use modern Node features without polyfills.
+
+## Scope
+
+**In scope:** standalone Apps Script web apps (`doGet`/`doPost`) and API executables, with services accessed by explicit ID (`openById`, `getCalendarById`, ...).
+
+**Out of scope:** container-bound scripts — `getActive*()`, `getUi()`/custom menus/dialogs/sidebars, container simple triggers (`onEdit`, `onSelectionChange`). Calling a container-bound API locally throws a clear "container-bound APIs are out of scope — use openById()" error, not a generic `undefined is not a function`.
 
 ## Implementation Decisions
 
-### Package name and distribution
-- Package name: `gas-p`, published to npm as a local dev dependency.
-- CLI invoked via `npx gas-p <command>` or via `package.json` scripts.
-- Minimum Node version: 22.
+### Package structure
+- Single npm package, name `gas-p` (not a monorepo — no `packages/` split until a second package actually exists).
+- Framework-agnostic core (`src/core/`) consumed by thin adapters (`src/adapters/`): `context.js` (builds the `vm` sandbox), `dispatch.js` (pure: context + fn name + args in, `{status, body}` out — no HTTP/framework awareness), `services.js` (Live-mode dispatch + subprocess bridge), `watcher.js` (wraps `chokidar`, emits reload events).
+- v1 ships the **Vite plugin adapter only** (`configureServer()`, mounts the RPC handler on Vite's middleware, pushes reload events over Vite's existing WS channel — same-origin, no CORS, single `vite dev` command). The standalone Express adapter is deferred; core's adapter-agnostic design keeps it cheap to add later.
 
-### User interface model
-- GAS source files remain completely unmodified — no imports from gas-p, no `await`, no changes.
-- Users create a local-only entry point (e.g., `local/run.ts`) that is excluded from clasp deployment via `.clasp.json` `rootDir` scoping.
-- The entry point calls `gas-p.run(() => myFunction())`, which sets up the GAS global scope, executes the function, and flushes the write queue on completion.
-- `tsx` is bundled as a dependency and used to execute TypeScript entry points with zero tsconfig configuration required from the user.
-
-### Standalone-only scope
-- Bound scripts (scripts attached to a Google Sheet/Doc/Form) are out of scope. `SpreadsheetApp.getActiveSpreadsheet()` and similar "active container" methods will throw `GasPNotImplementedError`.
-- All resource access must use explicit IDs (e.g., `SpreadsheetApp.openById('...')`).
-
-### Authentication
-- gas-p owns its own OAuth2 client, separate from clasp.
-- On `gas-p auth`, gas-p reads the OAuth scopes declared in the project's `appsscript.json` manifest and initiates a browser-based OAuth2 consent flow requesting exactly those scopes.
-- Credentials are stored at `~/.gas-p/credentials.json` (per-user, never committed).
-- The `googleapis` Node client handles token refresh automatically.
-
-### Stub generation strategy
-- The full GAS API surface is code-generated as stubs from `@types/google-apps-script`.
-- Every unimplemented method throws `GasPNotImplementedError` with the method name and a link to the gas-p GitHub issues page.
-- Real implementations are filled in progressively. This makes the implementation roadmap explicit and contributions straightforward.
-
-### Resource caching and async resolution
-- GAS is synchronous; `googleapis` is async. This mismatch is resolved via eager caching.
-- When a resource is first opened (e.g., `SpreadsheetApp.openById('abc')`), gas-p fetches the full resource from the Google API and caches it in memory.
-- All subsequent method calls on that resource (e.g., `getSheetByName`, `getRange`, `getValues`) operate synchronously on the cached data.
-- Write operations (e.g., `setValue`, `appendRow`) are queued in a Write Queue.
-- At the end of `gas-p.run()`, the Write Queue is flushed — all pending writes are applied to Google's APIs in sequence.
-- This mirrors how GAS itself batches writes and keeps user code synchronous.
+### Service Layer modes
+- Two modes exist in the design (`mode: "local" | "live"` is in the v1 config schema for forward compatibility), but **v1 implements Live mode only**. Local/fixture mode, matcher functions, and `--record` capture are deferred past v1.
+- **Live mode defaults on** with no config needed — matches the existing goal that local runs call real Google APIs so results match production.
+- **Write/read semantics are immediate, per-call**, not batched or cached. There is no generic Write Queue or Resource Cache in core — see [ADR 0001](docs/adr/0001-immediate-live-semantics-no-write-queue.md). Sheets is the one service permitted its own internal batching to mirror real Apps Script's auto-flush behavior.
+- **Sync-over-async bridge:** a synchronous subprocess call per service invocation (spawn a fresh Node process, run the async `googleapis` request inside it, return JSON over stdout). Validated by a working `CalendarApp` prototype. Per-call spawn overhead is accepted for v1 as a dev-loop cost — see [ADR 0002](docs/adr/0002-sync-over-async-subprocess-bridge.md).
+- **Resource-ID allowlist:** dev resource IDs (calendar IDs, spreadsheet IDs, etc.) must be declared in config. `openById()`/`getCalendarById()`/equivalents throw before any API call if the ID isn't in that allowlist — see [ADR 0003](docs/adr/0003-live-mode-resource-id-allowlist.md).
 
 ### Services in v1
-- `SpreadsheetApp` — backed by Google Sheets API v4
-- `CalendarApp` — backed by Google Calendar API v3
-- `UrlFetchApp` — backed by native Node `fetch`; returns an `HTTPResponse` shim with `.getContentText()`, `.getResponseCode()`, `.getHeaders()`; supports `muteHttpExceptions`; `fetchAll()` implemented via `Promise.all`
-- `PropertiesService` — backed by `gas-p.properties.json`; `getScriptProperties()` supported; `getUserProperties()` and `getDocumentProperties()` throw `GasPNotImplementedError`
-- `Logger` — `.log()` writes to stdout
+- `CalendarApp` — backed by Google Calendar API v3, prototyped and validated.
+- `UrlFetchApp` — backed by native Node `fetch`.
+- `Logger` — `.log()` writes to stdout.
+- **Fast-follow after v1** (not launch-blocking): `PropertiesService`, then `SpreadsheetApp` (Sheets is the largest per-service effort due to its imperative + auto-flush semantics vs. REST batching).
 
-### PropertiesService local storage
-- Script properties are stored in `gas-p.properties.json` at the project root.
-- The file is gitignored by default; gas-p warns and offers to add it to `.gitignore` on first `pull-properties` run.
-- `gas-p pull-properties` fetches the deployed script's properties via the Apps Script REST API and writes them to `gas-p.properties.json`.
-- No `.env` file support — `gas-p.properties.json` is the single source of truth for local properties.
+### PropertiesService — the one local-file exception
+- Unlike other services, `PropertiesService` stays backed by a local `gas-p.properties.json` file rather than routing through Live mode's real-API pass-through. Script properties are only reachable via the Apps Script REST API, which requires a deployed script — routing every property read/write through that would defeat the local dev loop.
+- `gas-p pull-properties` fetches the deployed script's properties via the Apps Script REST API and writes them to `gas-p.properties.json`. Gitignored by default; gas-p offers to add it to `.gitignore` on first run.
+- `getScriptProperties()` supported; `getUserProperties()`/`getDocumentProperties()` throw `GasPNotImplementedError`.
 
-### Error class
-- `GasPNotImplementedError` extends `Error`.
-- Message format: `"{ServiceName}.{methodName}() is not yet implemented in gas-p. 👉 Request it or contribute: https://github.com/{owner}/gas-p/issues"`
+### HTML templating
+- The Runtime Harness calls the user's real `doGet(e)` and evaluates the returned `HtmlOutput` against the real HTML files via a mock `HtmlService`, running single-file scriptlet templating (`<?= ?>`, `<?!= ?>`, `<?# ?>`).
+- Multi-file includes (`HtmlService.createHtmlOutputFromFile('partial').getContent()` stitched into another template) are deferred past v1 — budget the templating engine as a small one, not a full include-resolving system.
+
+### Authentication
+- Unchanged from the prior design: gas-p owns its own OAuth2 client, separate from clasp. `gas-p auth` reads OAuth scopes from `appsscript.json` and runs a browser-based consent flow. Credentials stored at `~/.gas-p/credentials.json` (per-user, never committed). `googleapis` handles token refresh.
+- Service account auth is a later addition for CI use cases, not a v1 requirement.
+
+### Config schema (v1)
+- `srcDir` — where the real `.gs`/`.js` source lives.
+- `entryFunctions` — declared local-runnable entry points.
+- `mode` — `"local" | "live"`, included now for forward compatibility, always `"live"` in v1 since Local mode doesn't exist yet.
+- `devResourceIds` — the allowlist of Google resource IDs Live mode is permitted to touch.
+- `port` — dev server port.
+- `fixtures` — **not** in the v1 schema; added when Local mode ships.
+
+### Stub generation
+- The full GAS API surface is code-generated as stubs from `@types/google-apps-script`. Unimplemented methods throw `GasPNotImplementedError` with the method name and a link to the gas-p GitHub issues page.
 
 ### Open source
-- MIT license.
-- Public GitHub repository from day one.
-- `CONTRIBUTING.md` documents the stub-filling pattern so contributors can add a method in isolation.
+- MIT license, public GitHub repo from day one.
 
-## Testing Decisions
+## Known Prod/Dev Parity Gaps (document for end users)
 
-### What makes a good test
-- Tests should exercise external behaviour — what the shim returns or what side effects it produces — not internal implementation details like how the cache is structured or how the write queue is iterated.
-- Tests should verify that a shim method returns the correct GAS-shaped response given a known API response, and that write operations are forwarded to the correct `googleapis` call with the correct parameters.
+- Transport is HTTP request/response locally vs. postMessage into a sandboxed iframe in prod — timing and payload-size behavior (~50MB one-way cap with Apps Script's own serialization overhead) won't perfectly match.
+- Promise-returning server functions: prod's failure to properly await them is intentionally replicated, not fixed.
+- Live mode is subject to real latency (including subprocess spawn overhead per call) and real Google API quota limits.
+- Container-bound APIs are out of scope entirely (see Scope).
+- No Local/fixture mode in v1 — every run needs real credentials and real (allowlisted) dev resources; no offline or credential-free CI path yet.
 
-### Modules to test
-- **Auth module**: verify that `appsscript.json` scopes are read correctly and that the OAuth client is constructed with the right parameters.
-- **Each service shim**: verify that implemented methods return correctly shaped GAS objects given mocked `googleapis` responses. Use `vitest` with mocked `googleapis` clients — do not make real API calls in tests.
-- **Write Queue**: verify that queued operations are flushed in order and that flush is called at the end of `gas-p.run()`.
-- **Resource Cache**: verify that a resource is fetched exactly once even when accessed multiple times within a single `run()` invocation.
-- **`GasPNotImplementedError`**: verify that stub methods throw with the correct message format including the GitHub issues link.
-- **`UrlFetchApp`**: verify `HTTPResponse` shim methods against mocked `fetch` responses; verify `muteHttpExceptions` behaviour; verify `fetchAll` fires requests in parallel.
-- **`PropertiesService`**: verify reads from `gas-p.properties.json`; verify `pull-properties` writes the correct file structure.
+## Out of Scope (v1)
 
-### Prior art
-- No existing codebase — this is a greenfield project. Establish `vitest` as the test runner from the start. Tests live alongside source in a `__tests__` directory per module.
-
-## Out of Scope
-
-- Bound scripts (scripts attached to a Google Sheet, Doc, or Form container).
-- `GmailApp`, `FormApp`, `SlidesApp`, `DocumentApp`, `DriveApp` — deferred to future versions.
-- `getUserProperties()` and `getDocumentProperties()` on `PropertiesService`.
+- Local/fixture mode, matcher functions, `--record` capture, fixture file format.
+- Standalone Express adapter (CORS/proxy guidance for non-Vite users).
+- `SpreadsheetApp`, `GmailApp`, `FormApp`, `SlidesApp`, `DocumentApp`, `DriveApp` — deferred to future versions.
+- Multi-file HTML template includes.
+- Bound scripts (scripts attached to a Google Sheet, Doc, or Form container) and all container-bound APIs.
 - Full fidelity emulation — gas-p is a development aid, not a complete GAS emulator.
-- Running GAS scripts that depend on GAS-specific features with no Node equivalent (e.g., `HtmlService`, triggers, time-based execution).
-- A Vite plugin or any build-time transformation of user source code.
 - Support for Node versions below 22.
 - Global npm installation — local dev dependency only.
 
+## Testing Decisions
+
+(Carried over from the prior design; conventions are orthogonal to the architecture pivot.)
+
+- Tests exercise external behavior — what a shim returns or what side effects it produces — not internal implementation details.
+- Each service shim: verify implemented methods return correctly shaped GAS objects given mocked `googleapis` responses (`vitest`, no real API calls in tests).
+- `GasPNotImplementedError`: verify stub methods throw with the correct message format including the GitHub issues link.
+- Auth module: verify `appsscript.json` scopes are read correctly and the OAuth client is constructed with the right parameters.
+- New for this architecture: Transport Shim (client-side `Proxy` behavior, chainable API, error reshaping), Runtime Harness (`vm` context rebuild per request, `doGet`/`HtmlOutput` scriptlet evaluation), the subprocess sync-over-async bridge (mock `child_process`), and the Vite adapter's `configureServer()` wiring.
+- Fixture files for known-good inputs live in `src/__tests__/__fixtures__/`; inline `fs.writeFileSync` only for malformed/error-case inputs.
+
 ## Further Notes
 
-- The eager caching strategy means that if a script conditionally accesses a resource (only opens a spreadsheet in one code branch), it is still fetched upfront when that branch is entered. This is an acceptable v1 trade-off.
-- The `local/` directory convention (excluded from clasp via `rootDir`) is the recommended pattern but not enforced — users can organise their entry points however they like as long as they stay outside the clasp `rootDir`.
-- The `gas-p pull-properties` command requires the Apps Script REST API to be enabled in the user's Google Cloud project — the same requirement as clasp. Users with clasp already configured should have no additional setup.
-- Future versions may explore a watch mode (`gas-p watch local/run.ts`) that re-runs on file change for a tighter feedback loop.
+- Future versions may explore Local/fixture mode + record/replay once Live mode is proven out, and a standalone Express adapter for non-Vite users.
+- The `gas-p pull-properties` command requires the Apps Script REST API to be enabled in the user's Google Cloud project — same requirement as clasp.

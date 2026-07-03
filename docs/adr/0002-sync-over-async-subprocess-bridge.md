@@ -1,0 +1,3 @@
+# Bridge sync GAS calls to async googleapis via a fresh subprocess per call
+
+Apps Script service calls are synchronous but `googleapis` is promise-based, and user `.gs` code correctly does not await. We chose a synchronous subprocess call (spawn a fresh Node process per call, run the async request inside it, return JSON over stdout) over a worker thread + `Atomics.wait`, validated by a working `CalendarApp` prototype. Per-call spawn overhead (~50-100ms+) is accepted for v1 as a dev-loop cost, not a production concern; a pooled/persistent worker is a later optimization if this proves painful in practice.

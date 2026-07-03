@@ -14,18 +14,11 @@ Issues are on GitHub at **https://github.com/evinle/gas-p/issues**. When the use
 
 ## Local Development Pattern
 
-The intended usage pattern for `gas-p` is:
+`gas-p` is a local dev server for standalone GAS web apps, run via the Vite plugin adapter (`vite dev`, single command, same-origin). The frontend keeps calling `google.script.run.someFunction(...)` completely unmodified — the Transport Shim (a `Proxy`-based drop-in, only active when `typeof google === "undefined"`) intercepts those calls and POSTs them to the local backend. The Runtime Harness executes the real `.gs`/`.js` source in an isolated `vm` context, rebuilt fresh per request, and calls the real `doGet(e)` to serve HTML with scriptlet templating evaluated. GAS source never imports from gas-p and is completely unmodified — no `run()` wrapper, no local-only entry point.
 
-```ts
-// local/run.ts
-import { run } from 'gas-p';
-import { sendWeeklyReport, updateSheet } from '../src/Code.js';
+Service calls (`CalendarApp`, etc.) resolve through Live mode by default: real Google API calls via `googleapis`, bridged synchronously through a subprocess-per-call. Every read and write is an immediate round-trip — there's no write batching or read caching in core. Dev resource IDs (calendar IDs, spreadsheet IDs, etc.) must be declared in config; calls against IDs outside that allowlist throw before any API call is made.
 
-// Swap out which function you want to debug
-run(sendWeeklyReport);
-```
-
-Run with `npx tsx local/run.ts`. The GAS source (`Code.ts`) never imports from gas-p — it uses `CalendarApp`, `Logger`, etc. as globals. `run()` injects shims into `globalThis` before calling the function, so GAS source is completely unmodified. All local-runnable functions live in one file; the developer just swaps the argument to `run()` to switch what they're debugging.
+See `PRD.md` and `docs/adr/` for the full architecture and the reasoning behind these decisions.
 
 ## Architecture
 

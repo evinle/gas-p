@@ -3,23 +3,29 @@
 ## GAS Source
 TypeScript files written to run on the Google Apps Script runtime. GAS Source is deployed to Google via clasp and must not import from gas-p or contain any Node-specific code.
 
-## Local Entry Point
-A TypeScript file that exists only for local development and is excluded from clasp deployment. Calls `gas-p.run()` wrapping one or more GAS Source functions. Never committed as part of the deployed script.
+## Runtime Harness
+The server-side component that executes the developer's real `.gs`/`.js` source files in an isolated Node `vm` context with a controlled global set (GAS services as sandbox globals). Rebuilt fresh per incoming request, matching Apps Script's per-execution model — no module-level state persists across calls.
 
-## Harness
-The `gas-p.run(fn)` execution wrapper. Sets up the GAS global scope, executes the provided function, and flushes the Write Queue on completion.
+## Transport Shim
+The client-side, `Proxy`-based drop-in for `google.script.run`. Only active when `typeof google === "undefined"` (i.e. never in production). Turns non-chain property access into a server function name, POSTs it to the local backend, and routes the response to the registered success/failure handler.
+
+## Service Layer
+The interception point where GAS service calls (`CalendarApp`, `SpreadsheetApp`, ...) resolve to either Local mode (fixture lookup) or Live mode (real API pass-through), selected via config.
+
+## Local mode
+A Service Layer mode that answers GAS service calls from a declared or recorded fixture map instead of calling real Google APIs. Synchronous by nature since it's just a lookup.
+
+## Live mode
+A Service Layer mode that translates GAS service calls to real Google API calls via `googleapis`, bridged synchronously via a subprocess (see Sync-Over-Async Bridge). Every call — read or write — is an immediate, live round-trip; there is no cross-call caching or write batching in core. (Sheets is the one service permitted its own internal batching to mirror real Apps Script's auto-flush behavior — see `SpreadsheetApp.flush()` parity note.)
+
+## Sync-Over-Async Bridge
+The mechanism that lets synchronous GAS-style code call the promise-based `googleapis` client without `await`. Implemented as a synchronous subprocess call (`execFileSync` spawning a fresh Node process per call that runs the async request and returns JSON over stdout) — validated by the working Calendar prototype.
 
 ## Shim
 A Node.js implementation of a GAS global service (e.g., `SpreadsheetApp`, `CalendarApp`) that exposes the same interface as the real GAS service, backed by real Google API calls via the `googleapis` package.
 
 ## Stub
 An unimplemented shim method generated from `@types/google-apps-script` that throws `GasPNotImplementedError` when called. Stubs represent the implementation backlog.
-
-## Resource Cache
-An in-memory store populated eagerly when a GAS resource is first opened (e.g., `SpreadsheetApp.openById()`). All subsequent method calls on that resource operate synchronously against the cache rather than making additional API calls.
-
-## Write Queue
-A queue of pending write operations accumulated during a `gas-p.run()` invocation. Flushed to the Google APIs in sequence at the end of `gas-p.run()`. Ensures GAS source code remains synchronous while writes are applied after all logic has completed.
 
 ## GasPNotImplementedError
 A custom error thrown by any Stub method. Includes the fully-qualified method name and a link to the gas-p GitHub issues page so developers can request or contribute the missing implementation.
