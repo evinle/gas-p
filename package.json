@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "Local development runtime for Google Apps Script TypeScript codebases",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evinle/gas-p.git"
+  },
+  "homepage": "https://github.com/evinle/gas-p#readme",
+  "bugs": {
+    "url": "https://github.com/evinle/gas-p/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"
