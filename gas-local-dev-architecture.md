@@ -225,8 +225,7 @@ middleware stack — don't conflate them:
    loads, POSTs to the RPC endpoint, returns serialized data, never HTML.
    (Implemented — see Transport Shim / core/dispatch.js above.)
 
-**Page-load wiring (not yet implemented as of this writing — `vitePlugin.ts`
-only mounts the RPC middleware today):**
+**Page-load wiring (implemented):**
 
 For the page-load channel, the plugin must serve complete HTML on every
 request with no build artifact to serve from in watch mode — the same
@@ -260,10 +259,11 @@ served HTML
 - Middleware must be registered **inside** `configureServer`, ordered before
   Vite's built-in HTML middleware, or Vite's parser may choke trying to treat
   a raw `<?= ?>` template as a plain HTML entry.
-- Scriptlet-evaluated templates live outside Vite's module graph, so editing
-  them won't trigger HMR on their own — extend the file watcher to watch
-  templates and fire a full-reload (`server.ws.send({ type: 'full-reload' })`
-  or a custom `gas-dev:reload` event) when they change.
+- **Not yet implemented:** scriptlet-evaluated templates live outside Vite's
+  module graph, so editing them won't trigger HMR on their own. Needs the
+  file watcher extended to watch templates and fire a full-reload
+  (`server.ws.send({ type: 'full-reload' })` or a custom `gas-dev:reload`
+  event) when they change.
 
 On the real wire, RPC responses carry Google's `)]}'` XSSI prefix and an
 internal `[["op-exec", ...]]` envelope; since the shim and backend are a
@@ -327,16 +327,19 @@ generic Write Queue or Resource Cache).
       (unchanged from the prior design). Service account auth deferred to a
       CI-focused follow-up.
 - [ ] Finalize config schema for v1: `srcDir`, `entry` (deterministic
-      bundle entry point for `.ts` source — see Runtime Harness), `mode`
-      (included now for forward compatibility, always `"live"` in v1),
+      bundle entry point for `.ts` source — see Runtime Harness; currently a
+      `GasPPluginOptions` field, not yet read from a `gas-p.config.ts` file),
+      `mode` (included now for forward compatibility, always `"live"` in v1),
       `devResourceIds`, `port`. `fixtures` is **not** in the v1 schema.
-- [ ] **`.ts` multi-file bundling** — `build({ write: false })` step ahead of
+- [x] **`.ts` multi-file bundling** — `build({ write: false })` step ahead of
       `vm.runInContext`, `cjs` output, `minify: false` +
       `rollupOptions.treeshake: false` (see Runtime Harness — scope addition
-      landed on #19 mid-implementation).
-- [ ] **Page-load wiring in the Vite plugin** — `doGet` → scriptlet harness →
-      `server.transformIndexHtml` is designed (see Adapters) but not yet
-      implemented; `vitePlugin.ts` currently only mounts the RPC middleware.
+      landed on #19 mid-implementation). `buildBundledContext` in
+      `core/context.ts`.
+- [x] **Page-load wiring in the Vite plugin** — `doGet` → scriptlet harness →
+      `server.transformIndexHtml`, served for GET requests to the configured
+      `page` (default `/`). Watcher-driven full-reload on template edits is
+      still open (see Adapters).
 - [ ] Container-bound API guard errors ("out of scope — use openById()").
 - [ ] `PropertiesService` stays local-file-backed (`gas-p.properties.json`,
       seeded via `gas-p pull-properties`) rather than routing through Live
