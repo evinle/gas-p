@@ -28,6 +28,8 @@ function fakeServer(use: ReturnType<typeof vi.fn>) {
     middlewares: { use },
     transformIndexHtml: vi.fn(async (_url: string, html: string) => html + '<!--hmr-client-->'),
     config: { resolve: {}, plugins: [], root: __dirname },
+    watcher: { add: vi.fn(), on: vi.fn() },
+    hot: { send: vi.fn() },
   };
 }
 
