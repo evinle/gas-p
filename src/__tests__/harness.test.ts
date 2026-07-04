@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
-import { renderDoGet } from '../core/harness.js';
+import { renderDoGet, renderDoGetBundled } from '../core/harness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, '__fixtures__', 'harness');
+const CONTEXT_FIXTURES = join(__dirname, '__fixtures__', 'context');
 
 describe('renderDoGet', () => {
   it('renders the HTML file returned by doGet unchanged when it has no scriptlets', () => {
@@ -53,5 +54,13 @@ describe('renderDoGet', () => {
   it('throws a ReferenceError when doGet references an undeclared global, matching real Apps Script', () => {
     expect(() => renderDoGet(join(FIXTURES, 'undeclared-global'))).toThrow(ReferenceError);
     expect(() => renderDoGet(join(FIXTURES, 'undeclared-global'))).toThrow(/someUndeclaredService is not defined/);
+  });
+});
+
+describe('renderDoGetBundled', () => {
+  it('throws a host-realm ReferenceError when doGet references an undeclared global in bundled .ts source', async () => {
+    const dir = join(CONTEXT_FIXTURES, 'undeclared-global');
+    await expect(renderDoGetBundled(dir, 'Code.ts')).rejects.toThrow(ReferenceError);
+    await expect(renderDoGetBundled(dir, 'Code.ts')).rejects.toThrow(/someUndeclaredService is not defined/);
   });
 });
