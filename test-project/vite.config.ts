@@ -5,5 +5,5 @@ import { gasPVitePlugin } from 'gas-p/vite';
 const srcDir = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
-  plugins: [gasPVitePlugin({ srcDir })],
+  plugins: [gasPVitePlugin({ srcDir, entry: 'Code.ts' })],
 });
