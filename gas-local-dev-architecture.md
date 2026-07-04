@@ -326,11 +326,14 @@ generic Write Queue or Resource Cache).
       `appsscript.json`, credentials at `~/.gas-p/credentials.json`
       (unchanged from the prior design). Service account auth deferred to a
       CI-focused follow-up.
-- [ ] Finalize config schema for v1: `srcDir`, `entry` (deterministic
-      bundle entry point for `.ts` source — see Runtime Harness; currently a
-      `GasPPluginOptions` field, not yet read from a `gas-p.config.ts` file),
-      `mode` (included now for forward compatibility, always `"live"` in v1),
-      `devResourceIds`, `port`. `fixtures` is **not** in the v1 schema.
+- [x] `gas-p.config.ts` read once at server start for `srcDir`/`entry` —
+      `core/config.ts`'s `loadGasPConfig`, consulted by `gasPVitePlugin` only
+      when `srcDir` isn't passed explicitly as a plugin option. `port` is
+      modeled on `GasPConfig` but not consumed by the Vite adapter (Vite's
+      own `server.port` already owns that).
+- [ ] Finalize remaining config schema for v1: `mode` (included now for
+      forward compatibility, always `"live"` in v1), `devResourceIds`.
+      `fixtures` is **not** in the v1 schema.
 - [x] **`.ts` multi-file bundling** — `build({ write: false })` step ahead of
       `vm.runInContext`, `cjs` output, `minify: false` +
       `rollupOptions.treeshake: false` (see Runtime Harness — scope addition
