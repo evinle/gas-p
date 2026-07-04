@@ -138,6 +138,10 @@ Everything else throws `GasPNotImplementedError` with the method name and a link
 
 See [gas-local-dev-architecture.md](gas-local-dev-architecture.md) for the full design and v1 scope, and [docs/adr/](docs/adr/) for the specific tradeoffs behind Live mode's semantics.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local dev setup, testing conventions, and how to file a bug or missing-method request.
+
 ## License
 
-MIT (intended license per the project's PRD — no `LICENSE` file or npm publish yet; see issue #11).
+[MIT](LICENSE)
