@@ -12,6 +12,10 @@
     <button id="get-events-rejected">Try an undeclared calendar ID</button>
     <pre id="events-result"></pre>
 
+    <button id="create-event">Create test event (default calendar)</button>
+    <button id="create-event-by-id">Create test event (explicit calendar ID)</button>
+    <pre id="create-event-result"></pre>
+
     <script type="module">
       import { installTransportShim } from 'gas-p/client';
 
@@ -48,6 +52,28 @@
             document.getElementById('events-result').textContent = 'Error: ' + error.message;
           })
           .getEventsForUndeclaredCalendar();
+      });
+
+      document.getElementById('create-event').addEventListener('click', () => {
+        google.script.run
+          .withSuccessHandler((event) => {
+            document.getElementById('create-event-result').textContent = JSON.stringify(event, null, 2);
+          })
+          .withFailureHandler((error) => {
+            document.getElementById('create-event-result').textContent = 'Error: ' + error.message;
+          })
+          .createTestEvent();
+      });
+
+      document.getElementById('create-event-by-id').addEventListener('click', () => {
+        google.script.run
+          .withSuccessHandler((event) => {
+            document.getElementById('create-event-result').textContent = JSON.stringify(event, null, 2);
+          })
+          .withFailureHandler((error) => {
+            document.getElementById('create-event-result').textContent = 'Error: ' + error.message;
+          })
+          .createTestEventOnCalendar();
       });
     </script>
   </body>

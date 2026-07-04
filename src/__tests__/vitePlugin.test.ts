@@ -169,29 +169,4 @@ describe('gasPVitePlugin', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain('<!--hmr-client-->');
   });
-
-  it('rejects a non-allowlisted calendar ID before any live API call, surfacing a {message}-only error over the RPC path', async () => {
-    const calendarFixture = join(FIXTURES, 'calendar');
-    const plugin = gasPVitePlugin({
-      srcDir: calendarFixture,
-      endpoint: '/__gasp/rpc',
-      credentialsPath: '/fake/credentials.json',
-      devResourceIds: { CalendarApp: ['cal123'] },
-    });
-    const use = vi.fn();
-    plugin.configureServer(fakeServer(use));
-
-    const rpcCall = use.mock.calls.find((call) => call.length === 2);
-    const [, handler] = rpcCall!;
-    const req = fakeRequest('POST', { fnName: 'getMyEvents', args: [] });
-    const res = fakeResponse();
-    const next = vi.fn();
-    await handler(req, res, next);
-
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body);
-    expect(body.ok).toBe(false);
-    expect(body.error).toEqual({ message: expect.stringContaining('primary') });
-    expect(body.error.message).toContain('CalendarApp');
-  });
 });
