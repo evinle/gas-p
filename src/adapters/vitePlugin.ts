@@ -24,15 +24,6 @@ interface ConnectMiddlewareStack {
   use(handler: MiddlewareHandler): void;
 }
 
-interface FSWatcherLike {
-  add(path: string): void;
-  on(event: 'change', listener: (path: string) => void): void;
-}
-
-interface HotChannelLike {
-  send(payload: { type: 'full-reload' }): void;
-}
-
 interface ViteDevServerLike {
   middlewares: ConnectMiddlewareStack;
   transformIndexHtml(url: string, html: string): Promise<string>;
@@ -41,8 +32,6 @@ interface ViteDevServerLike {
     resolve?: ConsumerViteConfig['resolve'];
     plugins?: readonly { name?: string }[];
   };
-  watcher: FSWatcherLike;
-  hot: HotChannelLike;
 }
 
 export interface GasPPluginOptions {
@@ -117,19 +106,6 @@ export function gasPVitePlugin(options: GasPPluginOptions): Plugin {
         plugins: (server.config.plugins ?? []).filter(isConsumerPlugin) as ConsumerViteConfig['plugins'],
       };
       const source = resolveSource(srcDir, entry, consumerConfig, services, options.htmlDir);
-
-      // .gs/.js (and bundled .ts) source is read straight off disk in
-      // buildContext/buildBundledContext, never through Vite's own
-      // transform pipeline, so it never enters Vite's module graph and
-      // server.watcher (Vite's own chokidar instance) doesn't watch it by
-      // default. Extending that existing watcher — rather than starting a
-      // second, independent chokidar instance — keeps everything on one
-      // file-watching process and lets us ride Vite's own WS channel.
-      server.watcher.add(srcDir);
-      server.watcher.on('change', (path) => {
-        if (!path.startsWith(srcDir)) return;
-        server.hot.send({ type: 'full-reload' });
-      });
 
       // No path filter and no returned callback: this runs on every request,
       // ahead of Vite's own HTML middleware, so a raw <?= ?> scriptlet

@@ -16,26 +16,11 @@ function fakeRequest(method: string, body: unknown, url = '/') {
   };
 }
 
-function fakeWatcher() {
-  const listeners: Record<string, ((path: string) => void) | undefined> = {};
-  return {
-    add: vi.fn(),
-    on: vi.fn((event: string, listener: (path: string) => void) => {
-      listeners[event] = listener;
-    }),
-    trigger(event: string, path: string) {
-      listeners[event]?.(path);
-    },
-  };
-}
-
 function fakeServer(use: ReturnType<typeof vi.fn>, config: Record<string, unknown> = {}) {
   return {
     middlewares: { use },
     transformIndexHtml: vi.fn(async (_url: string, html: string) => html + '<!--hmr-client-->'),
     config: { resolve: {}, plugins: [], root: __dirname, ...config },
-    watcher: fakeWatcher(),
-    hot: { send: vi.fn() },
   };
 }
 
@@ -237,39 +222,5 @@ describe('gasPVitePlugin', () => {
     const res = fakeResponse();
     await handler(req, res, vi.fn());
     expect(JSON.parse(res.body)).toEqual({ ok: true, value: 'org-789' });
-  });
-
-  it('sends a full-reload over the dev server\'s hot channel when a file under srcDir changes', async () => {
-    const srcDir = join(FIXTURES, 'basic');
-    const plugin = gasPVitePlugin({ srcDir, endpoint: '/__gasp/rpc' });
-    const use = vi.fn();
-    const server = fakeServer(use);
-    await plugin.configureServer(server);
-
-    server.watcher.trigger('change', join(srcDir, 'Code.gs'));
-
-    expect(server.hot.send).toHaveBeenCalledWith({ type: 'full-reload' });
-  });
-
-  it('does not send a reload for a change outside srcDir', async () => {
-    const srcDir = join(FIXTURES, 'basic');
-    const plugin = gasPVitePlugin({ srcDir, endpoint: '/__gasp/rpc' });
-    const use = vi.fn();
-    const server = fakeServer(use);
-    await plugin.configureServer(server);
-
-    server.watcher.trigger('change', join(__dirname, 'unrelated-file.ts'));
-
-    expect(server.hot.send).not.toHaveBeenCalled();
-  });
-
-  it("extends the dev server's own watcher to cover srcDir, instead of starting a separate one", async () => {
-    const srcDir = join(FIXTURES, 'basic');
-    const plugin = gasPVitePlugin({ srcDir, endpoint: '/__gasp/rpc' });
-    const use = vi.fn();
-    const server = fakeServer(use);
-    await plugin.configureServer(server);
-
-    expect(server.watcher.add).toHaveBeenCalledWith(srcDir);
   });
 });
