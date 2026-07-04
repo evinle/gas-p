@@ -23,6 +23,8 @@
   },
   "dependencies": {
     "commander": "^13.1.0",
+    "date-fns": "^4.4.0",
+    "date-fns-tz": "^3.2.0",
     "googleapis": "^173.0.0",
     "open": "^11.0.0",
     "tsx": "^4.19.4"

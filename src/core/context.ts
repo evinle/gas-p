@@ -5,6 +5,9 @@ import { build } from 'vite';
 import type { InlineConfig } from 'vite';
 import type { OutputChunk, RollupOutput } from 'rollup';
 import { createCalendarApp } from '../shims/CalendarApp.js';
+import { Utilities } from '../shims/Utilities.js';
+import { CacheService } from '../shims/CacheService.js';
+import { createSession } from '../shims/Session.js';
 
 export interface ServiceOptions {
   credentialsPath: string;
@@ -61,8 +64,11 @@ function createSandbox(srcDir: string, services?: ServiceOptions): vm.Context {
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
   sandbox.HtmlService = buildHtmlService(srcDir, sandbox);
+  sandbox.Utilities = Utilities;
+  sandbox.CacheService = CacheService;
   if (services) {
     sandbox.CalendarApp = createCalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
+    sandbox.Session = createSession(services.credentialsPath, services.clientSecretPath, srcDir);
   }
   return sandbox;
 }

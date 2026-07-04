@@ -6,6 +6,7 @@ import { buildContext, buildBundledContext } from '../core/context.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, '__fixtures__', 'harness');
 const CONTEXT_FIXTURES = join(__dirname, '__fixtures__', 'context');
+const SESSION_FIXTURES = join(__dirname, '__fixtures__', 'session');
 
 describe('buildContext', () => {
   it('throws a clear error when srcDir has no .gs/.js source files', () => {
@@ -22,6 +23,23 @@ describe('buildContext', () => {
     });
     expect(typeof sandbox.CalendarApp.getCalendarById).toBe('function');
     expect(() => sandbox.CalendarApp.getCalendarById('not-allowlisted')).toThrow(/not-allowlisted/);
+  });
+
+  it('exposes Utilities and CacheService as sandbox globals with no services option needed', () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = buildContext(dir);
+    expect(sandbox.Utilities.base64Decode('aGVsbG8=')).toEqual(Array.from(Buffer.from('hello')));
+    sandbox.CacheService.getScriptCache().put('key1', 'value1');
+    expect(sandbox.CacheService.getScriptCache().get('key1')).toBe('value1');
+  });
+
+  it('exposes Session as a sandbox global, gated by the services option', () => {
+    const dir = join(SESSION_FIXTURES, 'basic');
+    const sandbox = buildContext(dir, {
+      credentialsPath: '/fake/credentials.json',
+      clientSecretPath: '/fake/client_secret.json',
+    });
+    expect(sandbox.Session.getScriptTimeZone()).toBe('America/New_York');
   });
 });
 

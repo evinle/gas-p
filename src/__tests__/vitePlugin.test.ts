@@ -169,4 +169,27 @@ describe('gasPVitePlugin', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain('<!--hmr-client-->');
   });
+
+  it('reaches Utilities and Session from a dispatched .gs call over the RPC path', async () => {
+    const fixture = join(FIXTURES, 'utilities-session');
+    const plugin = gasPVitePlugin({
+      srcDir: fixture,
+      endpoint: '/__gasp/rpc',
+      credentialsPath: '/fake/credentials.json',
+      clientSecretPath: '/fake/client_secret.json',
+    });
+    const use = vi.fn();
+    plugin.configureServer(fakeServer(use));
+    const [, handler] = use.mock.calls.find((call) => call.length === 2)!;
+
+    const decodeReq = fakeRequest('POST', { fnName: 'decodeGreeting', args: [Buffer.from('hi').toString('base64')] });
+    const decodeRes = fakeResponse();
+    await handler(decodeReq, decodeRes, vi.fn());
+    expect(JSON.parse(decodeRes.body)).toEqual({ ok: true, value: 'hi' });
+
+    const tzReq = fakeRequest('POST', { fnName: 'getMyTimeZone', args: [] });
+    const tzRes = fakeResponse();
+    await handler(tzReq, tzRes, vi.fn());
+    expect(JSON.parse(tzRes.body)).toEqual({ ok: true, value: 'America/New_York' });
+  });
 });

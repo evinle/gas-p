@@ -1,5 +1,6 @@
 import type { calendar_v3 } from 'googleapis';
 import { runInSubprocess } from './subprocessBridge.js';
+import { buildGoogleAuthPreamble } from './googleAuthScript.js';
 
 interface CalendarEventsCallMap {
   list: {
@@ -27,11 +28,7 @@ function buildScript(credentialsPath: string, clientSecretPath: string, call: Go
 import { google } from 'googleapis';
 import { readFileSync } from 'fs';
 try {
-  const creds = JSON.parse(readFileSync(${JSON.stringify(credentialsPath)}, 'utf-8'));
-  const clientSecret = JSON.parse(readFileSync(${JSON.stringify(clientSecretPath)}, 'utf-8'));
-  const { client_id, client_secret } = clientSecret.installed;
-  const auth = new google.auth.OAuth2(client_id, client_secret, 'http://localhost');
-  auth.setCredentials(creds);
+  ${buildGoogleAuthPreamble(credentialsPath, clientSecretPath)}
   const client = google.${call.service}({ version: ${JSON.stringify(call.version)}, auth });
   const res = await client.${call.resource}.${call.method}(${JSON.stringify(call.params)});
   process.stdout.write(JSON.stringify(res.data));
