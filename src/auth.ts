@@ -1,8 +1,12 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { createServer } from 'http';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
+import { homedir } from 'os';
 import { google } from 'googleapis';
 import open from 'open';
+
+export const DEFAULT_CREDENTIALS_PATH = join(homedir(), '.gas-p', 'credentials.json');
+export const DEFAULT_CLIENT_SECRET_PATH = join(homedir(), '.gas-p', 'client_secret.json');
 
 export interface ClientSecret {
   clientId: string;

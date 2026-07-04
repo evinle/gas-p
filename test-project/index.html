@@ -8,6 +8,10 @@
     <button id="greet">Get greeting</button>
     <p id="result"></p>
 
+    <button id="get-events">Get my calendar events</button>
+    <button id="get-events-rejected">Try an undeclared calendar ID</button>
+    <pre id="events-result"></pre>
+
     <script type="module">
       import { installTransportShim } from 'gas-p/client';
 
@@ -22,6 +26,28 @@
             document.getElementById('result').textContent = 'Error: ' + error.message;
           })
           .getGreeting('World');
+      });
+
+      document.getElementById('get-events').addEventListener('click', () => {
+        google.script.run
+          .withSuccessHandler((events) => {
+            document.getElementById('events-result').textContent = JSON.stringify(events, null, 2);
+          })
+          .withFailureHandler((error) => {
+            document.getElementById('events-result').textContent = 'Error: ' + error.message;
+          })
+          .getMyEvents();
+      });
+
+      document.getElementById('get-events-rejected').addEventListener('click', () => {
+        google.script.run
+          .withSuccessHandler((events) => {
+            document.getElementById('events-result').textContent = JSON.stringify(events, null, 2);
+          })
+          .withFailureHandler((error) => {
+            document.getElementById('events-result').textContent = 'Error: ' + error.message;
+          })
+          .getEventsForUndeclaredCalendar();
       });
     </script>
   </body>

@@ -5,6 +5,7 @@ export interface GasPConfig {
   srcDir: string;
   entry?: string;
   port?: number;
+  devResourceIds?: Record<string, string[]>;
 }
 
 function isGasPConfig(x: unknown): x is GasPConfig {

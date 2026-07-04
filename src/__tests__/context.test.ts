@@ -12,6 +12,17 @@ describe('buildContext', () => {
     const emptyDir = join(CONTEXT_FIXTURES, 'empty');
     expect(() => buildContext(emptyDir)).toThrow(/No \.gs\/\.js source found in/);
   });
+
+  it('exposes CalendarApp as a sandbox global, gated by devResourceIds', () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = buildContext(dir, {
+      credentialsPath: '/fake/credentials.json',
+      clientSecretPath: '/fake/client_secret.json',
+      devResourceIds: { CalendarApp: ['cal123'] },
+    });
+    expect(typeof sandbox.CalendarApp.getCalendarById).toBe('function');
+    expect(() => sandbox.CalendarApp.getCalendarById('not-allowlisted')).toThrow(/not-allowlisted/);
+  });
 });
 
 describe('buildBundledContext', () => {

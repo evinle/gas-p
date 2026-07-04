@@ -13,6 +13,7 @@ describe('loadGasPConfig', () => {
     expect(config.srcDir).toBe(join(FIXTURES, 'basic', 'app-src'));
     expect(config.entry).toBe('Code.ts');
     expect(config.port).toBe(5555);
+    expect(config.devResourceIds).toEqual({ CalendarApp: ['cal123'] });
   });
 
   it('throws a clear error when the config file does not exist', async () => {

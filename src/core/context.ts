@@ -4,6 +4,13 @@ import { join, extname } from 'node:path';
 import { build } from 'vite';
 import type { InlineConfig } from 'vite';
 import type { OutputChunk, RollupOutput } from 'rollup';
+import { createCalendarApp } from '../shims/CalendarApp.js';
+
+export interface ServiceOptions {
+  credentialsPath: string;
+  clientSecretPath: string;
+  devResourceIds?: Record<string, string[]>;
+}
 
 export interface ConsumerViteConfig {
   resolve?: InlineConfig['resolve'];
@@ -50,17 +57,20 @@ function buildHtmlService(srcDir: string, context: vm.Context) {
   };
 }
 
-function createSandbox(srcDir: string): vm.Context {
+function createSandbox(srcDir: string, services?: ServiceOptions): vm.Context {
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
   sandbox.HtmlService = buildHtmlService(srcDir, sandbox);
+  if (services) {
+    sandbox.CalendarApp = createCalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
+  }
   return sandbox;
 }
 
 // Builds a fresh vm context per call, matching Apps Script's per-execution
 // model: no module-level state persists across separate buildContext calls.
-export function buildContext(srcDir: string): vm.Context {
-  const sandbox = createSandbox(srcDir);
+export function buildContext(srcDir: string, services?: ServiceOptions): vm.Context {
+  const sandbox = createSandbox(srcDir, services);
 
   const sourceFiles = readdirSync(srcDir).filter((f) => extname(f) === '.gs' || extname(f) === '.js');
   if (sourceFiles.length === 0) {
@@ -85,9 +95,10 @@ export function buildContext(srcDir: string): vm.Context {
 export async function buildBundledContext(
   srcDir: string,
   entry: string,
-  consumerConfig?: ConsumerViteConfig
+  consumerConfig?: ConsumerViteConfig,
+  services?: ServiceOptions
 ): Promise<vm.Context> {
-  const sandbox = createSandbox(srcDir);
+  const sandbox = createSandbox(srcDir, services);
   sandbox.module = { exports: {} };
 
   const result = await build({

@@ -1,8 +1,9 @@
 import { join } from 'node:path';
-import type { ConsumerViteConfig } from '../core/context.js';
+import type { ConsumerViteConfig, ServiceOptions } from '../core/context.js';
 import { handleRpcCall } from '../core/dispatch.js';
 import { resolveSource } from '../core/harness.js';
 import { loadGasPConfig } from '../core/config.js';
+import { DEFAULT_CREDENTIALS_PATH, DEFAULT_CLIENT_SECRET_PATH } from '../auth.js';
 
 interface RpcRequest {
   method?: string;
@@ -38,6 +39,9 @@ export interface GasPPluginOptions {
   endpoint?: string;
   page?: string;
   configFile?: string;
+  credentialsPath?: string;
+  clientSecretPath?: string;
+  devResourceIds?: Record<string, string[]>;
 }
 
 function isRpcRequestBody(x: unknown): x is { fnName: string; args: unknown[] } {
@@ -74,17 +78,32 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
         : await loadGasPConfig(options.configFile ?? join(server.config.root, 'gas-p.config.ts'));
       const srcDir = options.srcDir ?? fileConfig!.srcDir;
       const entry = options.entry ?? fileConfig?.entry;
+      const services: ServiceOptions = {
+        credentialsPath: options.credentialsPath ?? DEFAULT_CREDENTIALS_PATH,
+        clientSecretPath: options.clientSecretPath ?? DEFAULT_CLIENT_SECRET_PATH,
+        devResourceIds: options.devResourceIds ?? fileConfig?.devResourceIds,
+      };
 
       // Reuse the consumer's own resolved resolve/plugins config so the
       // dev-time bundle resolves aliases/imports identically to their real
-      // `vite build` output. Exclude this plugin itself from the passed-in
-      // list — feeding it back into the nested build() call would register
-      // it against that inner build for no benefit and unclear side effects.
+      // `vite build` output. server.config.plugins is the dev server's
+      // *fully resolved* plugin list, which also includes Vite's own
+      // internal serve-only plugins (vite:import-analysis, vite:resolve,
+      // the @rollup/plugin-alias instance it wires up, ...) — those close
+      // over a live dev-server moduleGraph/environment and crash
+      // (`environment.moduleGraph` is undefined) when reused inside our
+      // separate nested build() call below, which has no dev server behind
+      // it. The nested build() sets up its own equivalent core plugins from
+      // `resolve` already, so only genuinely consumer-added plugins (not
+      // named with Vite's own "vite:"/"alias"/this-plugin's-own prefixes)
+      // need to be threaded through here.
+      const isConsumerPlugin = (p: { name?: string }) =>
+        p.name !== undefined && p.name !== 'gas-p' && p.name !== 'alias' && !p.name.startsWith('vite:');
       const consumerConfig: ConsumerViteConfig = {
         resolve: server.config.resolve,
-        plugins: (server.config.plugins ?? []).filter((p) => p.name !== 'gas-p') as ConsumerViteConfig['plugins'],
+        plugins: (server.config.plugins ?? []).filter(isConsumerPlugin) as ConsumerViteConfig['plugins'],
       };
-      const source = resolveSource(srcDir, entry, consumerConfig);
+      const source = resolveSource(srcDir, entry, consumerConfig, services);
 
       // No path filter and no returned callback: this runs on every request,
       // ahead of Vite's own HTML middleware, so a raw <?= ?> scriptlet

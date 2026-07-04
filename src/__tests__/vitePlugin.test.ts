@@ -75,6 +75,42 @@ describe('gasPVitePlugin', () => {
     expect(JSON.parse(res.body)).toEqual({ ok: true, value: 5 });
   });
 
+  it('does not reuse the dev server\'s own internal serve-only plugins when bundling .ts source', async () => {
+    // server.config.plugins is Vite's *fully resolved* plugin list, which
+    // includes its own internal serve-only plugins (vite:import-analysis,
+    // the alias plugin it wires up, etc). Those close over a live dev-server
+    // moduleGraph/environment and throw if reused inside the nested build()
+    // call context.ts runs to bundle .ts source — so they must be filtered
+    // out rather than passed through untouched.
+    const throwingCorePlugin = {
+      name: 'vite:import-analysis',
+      transform() {
+        throw new Error('vite:import-analysis should not run outside its own dev server');
+      },
+    };
+    const throwingAliasPlugin = {
+      name: 'alias',
+      resolveId() {
+        throw new Error('the dev server\'s own alias plugin should not run outside its own dev server');
+      },
+    };
+
+    const tsFixture = join(__dirname, '__fixtures__', 'dispatch-ts', 'basic');
+    const plugin = gasPVitePlugin({ srcDir: tsFixture, entry: 'Code.ts', endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    const server = fakeServer(use, { plugins: [throwingCorePlugin, throwingAliasPlugin] });
+    plugin.configureServer(server);
+
+    const rpcCall = use.mock.calls.find((call) => call.length === 2);
+    const [, handler] = rpcCall!;
+    const req = fakeRequest('POST', { fnName: 'add', args: [2, 3] });
+    const res = fakeResponse();
+    const next = vi.fn();
+    await handler(req, res, next);
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, value: 5 });
+  });
+
   it("resolves an import against a path alias from the consumer's own resolved Vite config", async () => {
     const aliasFixture = join(__dirname, '__fixtures__', 'context', 'consumer-config-alias');
     const plugin = gasPVitePlugin({ srcDir: aliasFixture, entry: 'Code.ts', endpoint: '/__gasp/rpc' });
@@ -132,5 +168,30 @@ describe('gasPVitePlugin', () => {
     );
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain('<!--hmr-client-->');
+  });
+
+  it('rejects a non-allowlisted calendar ID before any live API call, surfacing a {message}-only error over the RPC path', async () => {
+    const calendarFixture = join(FIXTURES, 'calendar');
+    const plugin = gasPVitePlugin({
+      srcDir: calendarFixture,
+      endpoint: '/__gasp/rpc',
+      credentialsPath: '/fake/credentials.json',
+      devResourceIds: { CalendarApp: ['cal123'] },
+    });
+    const use = vi.fn();
+    plugin.configureServer(fakeServer(use));
+
+    const rpcCall = use.mock.calls.find((call) => call.length === 2);
+    const [, handler] = rpcCall!;
+    const req = fakeRequest('POST', { fnName: 'getMyEvents', args: [] });
+    const res = fakeResponse();
+    const next = vi.fn();
+    await handler(req, res, next);
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.ok).toBe(false);
+    expect(body.error).toEqual({ message: expect.stringContaining('primary') });
+    expect(body.error.message).toContain('CalendarApp');
   });
 });

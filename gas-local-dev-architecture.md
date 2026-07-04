@@ -331,9 +331,10 @@ generic Write Queue or Resource Cache).
       when `srcDir` isn't passed explicitly as a plugin option. `port` is
       modeled on `GasPConfig` but not consumed by the Vite adapter (Vite's
       own `server.port` already owns that).
-- [ ] Finalize remaining config schema for v1: `mode` (included now for
-      forward compatibility, always `"live"` in v1), `devResourceIds`.
-      `fixtures` is **not** in the v1 schema.
+- [x] `devResourceIds` added to `GasPConfig` (keyed by GAS global service
+      name, e.g. `{ CalendarApp: [...] }`) and wired into `CalendarApp`'s
+      allowlist gate via the Vite adapter. `mode` (forward-compat, always
+      `"live"` in v1) still outstanding; `fixtures` is **not** in the v1 schema.
 - [x] **`.ts` multi-file bundling** — `build({ write: false })` step ahead of
       `vm.runInContext`, `cjs` output, `minify: false` +
       `rollupOptions.treeshake: false` (see Runtime Harness — scope addition

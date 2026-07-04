@@ -1,5 +1,8 @@
-import { execFileSync } from 'child_process';
 import { GasPNotImplementedError } from '../errors.js';
+import { assertResourceAllowed } from '../core/allowlist.js';
+import { runGoogleApiCall } from '../core/googleApiCall.js';
+
+const SERVICE = 'CalendarApp';
 
 interface RawEvent {
   id: string;
@@ -15,52 +18,6 @@ function isRawEvent(x: unknown): x is RawEvent {
   if (!('start' in x) || typeof x.start !== 'object' || x.start === null) return false;
   if (!('end' in x) || typeof x.end !== 'object' || x.end === null) return false;
   return true;
-}
-
-function buildFetchEventsScript(credentialsPath: string, calendarId: string, startTime: Date, endTime: Date): string {
-  return `
-import { google } from 'googleapis';
-import { readFileSync } from 'fs';
-const creds = JSON.parse(readFileSync(${JSON.stringify(credentialsPath)}, 'utf-8'));
-const auth = new google.auth.OAuth2();
-auth.setCredentials(creds);
-const cal = google.calendar({ version: 'v3', auth });
-const res = await cal.events.list({
-  calendarId: ${JSON.stringify(calendarId)},
-  timeMin: ${JSON.stringify(startTime.toISOString())},
-  timeMax: ${JSON.stringify(endTime.toISOString())},
-  singleEvents: true,
-});
-process.stdout.write(JSON.stringify(res.data.items ?? []));
-`;
-}
-
-function buildCreateEventScript(credentialsPath: string, calendarId: string, title: string, startTime: Date, endTime: Date): string {
-  return `
-import { google } from 'googleapis';
-import { readFileSync } from 'fs';
-const creds = JSON.parse(readFileSync(${JSON.stringify(credentialsPath)}, 'utf-8'));
-const auth = new google.auth.OAuth2();
-auth.setCredentials(creds);
-const cal = google.calendar({ version: 'v3', auth });
-const res = await cal.events.insert({
-  calendarId: ${JSON.stringify(calendarId)},
-  requestBody: {
-    summary: ${JSON.stringify(title)},
-    start: { dateTime: ${JSON.stringify(startTime.toISOString())} },
-    end: { dateTime: ${JSON.stringify(endTime.toISOString())} },
-  },
-});
-process.stdout.write(JSON.stringify(res.data));
-`;
-}
-
-function execScript(script: string): unknown {
-  const output = execFileSync(process.execPath, ['--input-type=module'], {
-    input: script,
-    encoding: 'utf-8',
-  });
-  return JSON.parse(output);
 }
 
 export interface IGasCalendarEvent {
@@ -86,31 +43,62 @@ class CalendarEvent implements IGasCalendarEvent {
 class Calendar implements IGasCalendar {
   private eventsCache: RawEvent[] | null = null;
 
-  constructor(private calendarId: string, private credentialsPath: string) {}
+  constructor(private calendarId: string, private credentialsPath: string, private clientSecretPath: string) {}
 
   getEvents(startTime: Date, endTime: Date): CalendarEvent[] {
     if (!this.eventsCache) {
-      const raw = execScript(buildFetchEventsScript(this.credentialsPath, this.calendarId, startTime, endTime));
-      if (!Array.isArray(raw) || !raw.every(isRawEvent)) throw new Error('Unexpected events response shape');
+      const { items } = runGoogleApiCall(this.credentialsPath, this.clientSecretPath, {
+        service: 'calendar',
+        version: 'v3',
+        resource: 'events',
+        method: 'list',
+        params: {
+          calendarId: this.calendarId,
+          timeMin: startTime.toISOString(),
+          timeMax: endTime.toISOString(),
+          singleEvents: true,
+        },
+      });
+      const raw = items ?? [];
+      if (!raw.every(isRawEvent)) throw new Error('Unexpected events response shape');
       this.eventsCache = raw;
     }
     return this.eventsCache.map((e) => new CalendarEvent(e));
   }
 
   createEvent(title: string, startTime: Date, endTime: Date): CalendarEvent {
-    const raw = execScript(buildCreateEventScript(this.credentialsPath, this.calendarId, title, startTime, endTime));
+    const raw = runGoogleApiCall(this.credentialsPath, this.clientSecretPath, {
+      service: 'calendar',
+      version: 'v3',
+      resource: 'events',
+      method: 'insert',
+      params: {
+        calendarId: this.calendarId,
+        requestBody: {
+          summary: title,
+          start: { dateTime: startTime.toISOString() },
+          end: { dateTime: endTime.toISOString() },
+        },
+      },
+    });
     if (!isRawEvent(raw)) throw new Error('Unexpected create event response shape');
     return new CalendarEvent(raw);
   }
 }
 
-export function createCalendarApp(credentialsPath: string) {
+export function createCalendarApp(
+  credentialsPath: string,
+  clientSecretPath: string,
+  devResourceIds: Record<string, string[]> | undefined
+) {
   return {
     getCalendarById(id: string): Calendar {
-      return new Calendar(id, credentialsPath);
+      assertResourceAllowed(devResourceIds, SERVICE, id);
+      return new Calendar(id, credentialsPath, clientSecretPath);
     },
     getDefaultCalendar(): Calendar {
-      return new Calendar('primary', credentialsPath);
+      assertResourceAllowed(devResourceIds, SERVICE, 'primary');
+      return new Calendar('primary', credentialsPath, clientSecretPath);
     },
     getCalendarsByName(_name: string): never {
       throw new GasPNotImplementedError('CalendarApp', 'getCalendarsByName');
