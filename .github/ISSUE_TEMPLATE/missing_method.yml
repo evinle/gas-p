@@ -1,0 +1,35 @@
+name: Missing method / feature request
+description: A GAS global service method throws GasPNotImplementedError, or you'd like a new feature.
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of request is this?
+      options:
+        - Missing shim method (unimplemented stub)
+        - New feature
+    validations:
+      required: true
+  - type: input
+    id: service-method
+    attributes:
+      label: Service and method
+      description: If reporting a missing shim method, name the service and method (e.g. `SpreadsheetApp.getActiveSheet()`).
+      placeholder: e.g. SpreadsheetApp.getActiveSheet()
+    validations:
+      required: false
+  - type: textarea
+    id: description
+    attributes:
+      label: What do you need it to do?
+      description: Describe the behavior you expect, matching real Apps Script semantics where applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What are you trying to build that this unblocks?
+    validations:
+      required: false

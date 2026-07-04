@@ -2,6 +2,7 @@
   "name": "gas-p",
   "version": "0.1.0",
   "description": "Local development runtime for Google Apps Script TypeScript codebases",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -16,6 +17,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
@@ -30,7 +34,7 @@
     "tsx": "^4.19.4"
   },
   "peerDependencies": {
-    "vite": "^7.0.0"
+    "vite": "^7.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.15.29",
