@@ -47,4 +47,41 @@ describe('runGenerator', () => {
     expect(output).toContain("'getDocumentCache'");
     expect(output).toContain("'getUserCache'");
   });
+
+  it('disambiguates same-named methods across sibling containers via implementationScope', () => {
+    const targets: StubTarget[] = [
+      {
+        typesFile: FIXTURE,
+        qualifiedInterfaceName: 'GoogleAppsScript.Cache.CacheService',
+        outputName: 'RealOne',
+        existingShimFile: '/fake/shim.ts',
+        implementationScope: 'RealOne',
+      },
+      {
+        typesFile: FIXTURE,
+        qualifiedInterfaceName: 'GoogleAppsScript.Cache.CacheService',
+        outputName: 'StubOne',
+        existingShimFile: '/fake/shim.ts',
+        implementationScope: 'StubOne',
+      },
+    ];
+
+    const source = `
+      export const RealOne = {
+        getScriptCache() {
+          return 'a real implementation';
+        },
+      };
+      export const StubOne = {
+        getScriptCache(): never {
+          throw new GasPNotImplementedError('StubOne', 'getScriptCache');
+        },
+      };
+    `;
+
+    const result = runGenerator(targets, () => source);
+
+    expect(result.get('RealOne')).not.toContain("'getScriptCache'");
+    expect(result.get('StubOne')).toContain("'getScriptCache'");
+  });
 });

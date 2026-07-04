@@ -22,5 +22,24 @@ export const stubTargets: StubTarget[] = [
     qualifiedInterfaceName: 'GoogleAppsScript.Cache.Cache',
     outputName: 'Cache',
     existingShimFile: join(SRC_ROOT, 'shims/CacheService.ts'),
+    implementationScope: 'scriptCache',
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.calendar.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.CalendarApp',
+    outputName: 'CalendarApp',
+    existingShimFile: join(SRC_ROOT, 'shims/CalendarApp.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.calendar.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Calendar',
+    outputName: 'Calendar',
+    existingShimFile: join(SRC_ROOT, 'shims/CalendarApp.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.calendar.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.CalendarEvent',
+    outputName: 'CalendarEvent',
+    existingShimFile: join(SRC_ROOT, 'shims/CalendarApp.ts'),
   },
 ];

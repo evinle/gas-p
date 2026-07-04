@@ -7,6 +7,8 @@ export interface StubTarget {
   qualifiedInterfaceName: string;
   outputName: string;
   existingShimFile?: string;
+  /** Name of the class/factory/const in existingShimFile whose members represent this interface's implementation. Defaults to outputName. */
+  implementationScope?: string;
 }
 
 export function runGenerator(
@@ -18,7 +20,9 @@ export function runGenerator(
   for (const target of targets) {
     const methods = extractMethodSurface(target.typesFile, target.qualifiedInterfaceName);
     const existingSource = target.existingShimFile ? readShimSource(target.existingShimFile) : undefined;
-    const implemented = existingSource ? findImplementedMethods(existingSource) : new Set<string>();
+    const implemented = existingSource
+      ? findImplementedMethods(existingSource, target.implementationScope ?? target.outputName)
+      : new Set<string>();
     result.set(target.outputName, generateStubSource(target.outputName, methods, implemented));
   }
 

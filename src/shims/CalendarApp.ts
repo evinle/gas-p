@@ -1,6 +1,8 @@
-import { GasPNotImplementedError } from '../errors.js';
 import { assertResourceAllowed } from '../core/allowlist.js';
 import { runGoogleApiCall } from '../core/googleApiCall.js';
+import { CalendarAppStubs } from './generated/CalendarApp.stubs.js';
+import { CalendarStubs } from './generated/Calendar.stubs.js';
+import { CalendarEventStubs } from './generated/CalendarEvent.stubs.js';
 
 const SERVICE = 'CalendarApp';
 
@@ -20,40 +22,36 @@ function isRawEvent(x: unknown): x is RawEvent {
   return true;
 }
 
-export interface IGasCalendarEvent {
-  getTitle(): string;
-  getSummary(): string;
-  getStartTime(): Date;
-  getEndTime(): Date;
+function createCalendarEvent(raw: RawEvent) {
+  return {
+    ...CalendarEventStubs,
+    getTitle(): string {
+      return raw.summary;
+    },
+    getSummary(): string {
+      return raw.summary;
+    },
+    getStartTime(): Date {
+      return new Date(raw.start.dateTime);
+    },
+    getEndTime(): Date {
+      return new Date(raw.end.dateTime);
+    },
+  };
 }
 
-export interface IGasCalendar {
-  getEvents(startTime: Date, endTime: Date): IGasCalendarEvent[];
-  createEvent(title: string, startTime: Date, endTime: Date): IGasCalendarEvent;
-}
+function createCalendar(calendarId: string, credentialsPath: string, clientSecretPath: string) {
+  let eventsCache: RawEvent[] | null = null;
 
-class CalendarEvent implements IGasCalendarEvent {
-  constructor(private raw: RawEvent) {}
-  getTitle(): string { return this.raw.summary; }
-  getSummary(): string { return this.raw.summary; }
-  getStartTime(): Date { return new Date(this.raw.start.dateTime); }
-  getEndTime(): Date { return new Date(this.raw.end.dateTime); }
-}
-
-class Calendar implements IGasCalendar {
-  private eventsCache: RawEvent[] | null = null;
-
-  constructor(private calendarId: string, private credentialsPath: string, private clientSecretPath: string) {}
-
-  getEvents(startTime: Date, endTime: Date): CalendarEvent[] {
-    if (!this.eventsCache) {
-      const { items } = runGoogleApiCall(this.credentialsPath, this.clientSecretPath, {
+  function getEvents(startTime: Date, endTime: Date) {
+    if (!eventsCache) {
+      const { items } = runGoogleApiCall(credentialsPath, clientSecretPath, {
         service: 'calendar',
         version: 'v3',
         resource: 'events',
         method: 'list',
         params: {
-          calendarId: this.calendarId,
+          calendarId,
           timeMin: startTime.toISOString(),
           timeMax: endTime.toISOString(),
           singleEvents: true,
@@ -61,19 +59,19 @@ class Calendar implements IGasCalendar {
       });
       const raw = items ?? [];
       if (!raw.every(isRawEvent)) throw new Error('Unexpected events response shape');
-      this.eventsCache = raw;
+      eventsCache = raw;
     }
-    return this.eventsCache.map((e) => new CalendarEvent(e));
+    return eventsCache.map(createCalendarEvent);
   }
 
-  createEvent(title: string, startTime: Date, endTime: Date): CalendarEvent {
-    const raw = runGoogleApiCall(this.credentialsPath, this.clientSecretPath, {
+  function createEvent(title: string, startTime: Date, endTime: Date) {
+    const raw = runGoogleApiCall(credentialsPath, clientSecretPath, {
       service: 'calendar',
       version: 'v3',
       resource: 'events',
       method: 'insert',
       params: {
-        calendarId: this.calendarId,
+        calendarId,
         requestBody: {
           summary: title,
           start: { dateTime: startTime.toISOString() },
@@ -82,8 +80,14 @@ class Calendar implements IGasCalendar {
       },
     });
     if (!isRawEvent(raw)) throw new Error('Unexpected create event response shape');
-    return new CalendarEvent(raw);
+    return createCalendarEvent(raw);
   }
+
+  return {
+    ...CalendarStubs,
+    getEvents,
+    createEvent,
+  };
 }
 
 export function createCalendarApp(
@@ -92,19 +96,14 @@ export function createCalendarApp(
   devResourceIds: Record<string, string[]> | undefined
 ) {
   return {
-    getCalendarById(id: string): Calendar {
+    ...CalendarAppStubs,
+    getCalendarById(id: string) {
       assertResourceAllowed(devResourceIds, SERVICE, id);
-      return new Calendar(id, credentialsPath, clientSecretPath);
+      return createCalendar(id, credentialsPath, clientSecretPath);
     },
-    getDefaultCalendar(): Calendar {
+    getDefaultCalendar() {
       assertResourceAllowed(devResourceIds, SERVICE, 'primary');
-      return new Calendar('primary', credentialsPath, clientSecretPath);
-    },
-    getCalendarsByName(_name: string): never {
-      throw new GasPNotImplementedError('CalendarApp', 'getCalendarsByName');
-    },
-    getOwnedCalendars(): never {
-      throw new GasPNotImplementedError('CalendarApp', 'getOwnedCalendars');
+      return createCalendar('primary', credentialsPath, clientSecretPath);
     },
   };
 }

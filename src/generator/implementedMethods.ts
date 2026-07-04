@@ -7,8 +7,118 @@ function isGasPNotImplementedThrow(statement: ts.Statement): boolean {
   return ts.isIdentifier(expr.expression) && expr.expression.text === 'GasPNotImplementedError';
 }
 
-export function findImplementedMethods(source: string): Set<string> {
-  const sourceFile = ts.createSourceFile('shim.ts', source, ts.ScriptTarget.Latest, true);
+function bodyIsStub(body: ts.Block | undefined): boolean {
+  return body !== undefined && body.statements.length === 1 && isGasPNotImplementedThrow(body.statements[0]!);
+}
+
+function collectFunctionDeclarations(sourceFile: ts.SourceFile): Map<string, ts.FunctionDeclaration> {
+  const map = new Map<string, ts.FunctionDeclaration>();
+  function visit(node: ts.Node): void {
+    if (ts.isFunctionDeclaration(node) && node.name) map.set(node.name.text, node);
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return map;
+}
+
+function scanObjectLiteralMembers(
+  obj: ts.ObjectLiteralExpression,
+  functionDecls: Map<string, ts.FunctionDeclaration>,
+  implemented: Set<string>
+): void {
+  for (const prop of obj.properties) {
+    if (ts.isMethodDeclaration(prop) && ts.isIdentifier(prop.name)) {
+      if (!bodyIsStub(prop.body)) implemented.add(prop.name.text);
+    } else if (ts.isShorthandPropertyAssignment(prop)) {
+      const name = prop.name.text;
+      const fn = functionDecls.get(name);
+      if (!fn || !bodyIsStub(fn.body)) implemented.add(name);
+    }
+  }
+}
+
+function findClassScope(sourceFile: ts.SourceFile, name: string): ts.ClassDeclaration | undefined {
+  let found: ts.ClassDeclaration | undefined;
+  function visit(node: ts.Node): void {
+    if (found) return;
+    if (ts.isClassDeclaration(node) && node.name?.text === name) found = node;
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return found;
+}
+
+function findReturnedObjectLiteral(fn: ts.FunctionDeclaration): ts.ObjectLiteralExpression | undefined {
+  let found: ts.ObjectLiteralExpression | undefined;
+  function visit(node: ts.Node): void {
+    if (found) return;
+    if (ts.isReturnStatement(node) && node.expression && ts.isObjectLiteralExpression(node.expression)) {
+      found = node.expression;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  if (fn.body) visit(fn.body);
+  return found;
+}
+
+function findFactoryReturnObject(sourceFile: ts.SourceFile, scopeName: string): ts.ObjectLiteralExpression | undefined {
+  const factoryDecls = collectFunctionDeclarations(sourceFile);
+  const factory = factoryDecls.get(`create${scopeName}`);
+  return factory ? findReturnedObjectLiteral(factory) : undefined;
+}
+
+function findConstObjectLiteral(sourceFile: ts.SourceFile, name: string): ts.ObjectLiteralExpression | undefined {
+  let found: ts.ObjectLiteralExpression | undefined;
+  function visit(node: ts.Node): void {
+    if (found) return;
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer &&
+      ts.isObjectLiteralExpression(node.initializer)
+    ) {
+      found = node.initializer;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return found;
+}
+
+function findImplementedMethodsInScope(sourceFile: ts.SourceFile, scopeName: string): Set<string> {
+  const implemented = new Set<string>();
+
+  const classScope = findClassScope(sourceFile, scopeName);
+  if (classScope) {
+    for (const member of classScope.members) {
+      if (ts.isMethodDeclaration(member) && ts.isIdentifier(member.name) && !bodyIsStub(member.body)) {
+        implemented.add(member.name.text);
+      }
+    }
+    return implemented;
+  }
+
+  const functionDecls = collectFunctionDeclarations(sourceFile);
+
+  const factoryObj = findFactoryReturnObject(sourceFile, scopeName);
+  if (factoryObj) {
+    scanObjectLiteralMembers(factoryObj, functionDecls, implemented);
+    return implemented;
+  }
+
+  const constObj = findConstObjectLiteral(sourceFile, scopeName);
+  if (constObj) {
+    scanObjectLiteralMembers(constObj, functionDecls, implemented);
+    return implemented;
+  }
+
+  throw new Error(`findImplementedMethods: could not locate implementation scope "${scopeName}"`);
+}
+
+function findImplementedMethodsInFile(sourceFile: ts.SourceFile): Set<string> {
   const implemented = new Set<string>();
 
   function visit(node: ts.Node): void {
@@ -16,11 +126,11 @@ export function findImplementedMethods(source: string): Set<string> {
       (ts.isMethodDeclaration(node) && ts.isIdentifier(node.name)) ||
       (ts.isFunctionDeclaration(node) && node.name !== undefined);
 
-    if (isNamedFunction && node.body && ts.isBlock(node.body)) {
+    if (isNamedFunction) {
       const name = (node as ts.MethodDeclaration | ts.FunctionDeclaration).name;
-      if (name && ts.isIdentifier(name)) {
-        const isStub = node.body.statements.length === 1 && isGasPNotImplementedThrow(node.body.statements[0]!);
-        if (!isStub) implemented.add(name.text);
+      const body = (node as ts.MethodDeclaration | ts.FunctionDeclaration).body;
+      if (name && ts.isIdentifier(name) && body && ts.isBlock(body) && !bodyIsStub(body)) {
+        implemented.add(name.text);
       }
     }
     ts.forEachChild(node, visit);
@@ -28,4 +138,11 @@ export function findImplementedMethods(source: string): Set<string> {
 
   visit(sourceFile);
   return implemented;
+}
+
+export function findImplementedMethods(source: string, scopeName?: string): Set<string> {
+  const sourceFile = ts.createSourceFile('shim.ts', source, ts.ScriptTarget.Latest, true);
+  return scopeName === undefined
+    ? findImplementedMethodsInFile(sourceFile)
+    : findImplementedMethodsInScope(sourceFile, scopeName);
 }
