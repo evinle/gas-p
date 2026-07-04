@@ -1,4 +1,5 @@
-import { buildContext, isHtmlOutput } from './context.js';
+import { buildContext, buildBundledContext, isHtmlOutput } from './context.js';
+import type vm from 'node:vm';
 
 const HOST_ERROR_CONSTRUCTORS: Record<string, ErrorConstructor> = {
   ReferenceError,
@@ -29,13 +30,11 @@ export function rethrowInHostRealm(error: unknown): never {
   throw error;
 }
 
-export function renderDoGet(srcDir: string): string {
+function invokeDoGet(context: vm.Context): string {
   try {
-    const context = buildContext(srcDir);
-
     const doGet = context.doGet;
     if (typeof doGet !== 'function') {
-      throw new Error(`doGet is not defined in ${srcDir}`);
+      throw new Error('doGet is not defined');
     }
 
     const result: unknown = doGet();
@@ -46,4 +45,14 @@ export function renderDoGet(srcDir: string): string {
   } catch (error) {
     rethrowInHostRealm(error);
   }
+}
+
+export function renderDoGet(srcDir: string): string {
+  const context = buildContext(srcDir);
+  return invokeDoGet(context);
+}
+
+export async function renderDoGetBundled(srcDir: string, entry: string): Promise<string> {
+  const context = await buildBundledContext(srcDir, entry);
+  return invokeDoGet(context);
 }

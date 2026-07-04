@@ -1,8 +1,10 @@
 import { buildContext, buildBundledContext } from '../core/context.js';
 import { handleRpcCall } from '../core/dispatch.js';
+import { renderDoGet, renderDoGetBundled } from '../core/harness.js';
 
 interface RpcRequest {
   method?: string;
+  url?: string;
   [Symbol.asyncIterator](): AsyncIterableIterator<Buffer | string>;
 }
 
@@ -11,18 +13,23 @@ interface RpcResponse {
   end(chunk: string): void;
 }
 
+type MiddlewareHandler = (req: RpcRequest, res: RpcResponse, next: () => void) => void | Promise<void>;
+
 interface ConnectMiddlewareStack {
-  use(path: string, handler: (req: RpcRequest, res: RpcResponse, next: () => void) => void | Promise<void>): void;
+  use(path: string, handler: MiddlewareHandler): void;
+  use(handler: MiddlewareHandler): void;
 }
 
 interface ViteDevServerLike {
   middlewares: ConnectMiddlewareStack;
+  transformIndexHtml(url: string, html: string): Promise<string>;
 }
 
 export interface GasPPluginOptions {
   srcDir: string;
   entry?: string;
   endpoint?: string;
+  page?: string;
 }
 
 function isRpcRequestBody(x: unknown): x is { fnName: string; args: unknown[] } {
@@ -45,10 +52,29 @@ async function readBody(req: RpcRequest): Promise<string> {
 // outcome via dispatch.ts's {ok, value} / {ok: false, error} contract.
 export function gasPVitePlugin(options: GasPPluginOptions) {
   const endpoint = options.endpoint ?? '/__gasp/rpc';
+  const page = options.page ?? '/';
 
   return {
     name: 'gas-p',
     configureServer(server: ViteDevServerLike) {
+      // No path filter and no returned callback: this runs on every request,
+      // ahead of Vite's own HTML middleware, so a raw <?= ?> scriptlet
+      // template is never handed to Vite's HTML parser as a plain entry file.
+      server.middlewares.use(async (req, res, next) => {
+        if (req.method !== 'GET' || req.url !== page) {
+          next();
+          return;
+        }
+
+        const html = options.entry
+          ? await renderDoGetBundled(options.srcDir, options.entry)
+          : renderDoGet(options.srcDir);
+        const transformed = await server.transformIndexHtml(req.url, html);
+
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(transformed);
+      });
+
       server.middlewares.use(endpoint, async (req, res, next) => {
         if (req.method !== 'POST') {
           next();
