@@ -47,4 +47,20 @@ describe('gasPVitePlugin', () => {
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ ok: true, value: 5 });
   });
+
+  it('bundles a multi-file .ts entry before dispatching, when configured with entry', async () => {
+    const tsFixture = join(__dirname, '__fixtures__', 'dispatch-ts', 'basic');
+    const plugin = gasPVitePlugin({ srcDir: tsFixture, entry: 'Code.ts', endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    plugin.configureServer({ middlewares: { use } });
+
+    const [, handler] = use.mock.calls[0];
+    const req = fakeRequest('POST', { fnName: 'add', args: [2, 3] });
+    const res = fakeResponse();
+    const next = vi.fn();
+    await handler(req, res, next);
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ok: true, value: 5 });
+  });
 });

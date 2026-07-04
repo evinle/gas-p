@@ -1,4 +1,4 @@
-import { buildContext } from '../core/context.js';
+import { buildContext, buildBundledContext } from '../core/context.js';
 import { handleRpcCall } from '../core/dispatch.js';
 
 interface RpcRequest {
@@ -21,6 +21,7 @@ interface ViteDevServerLike {
 
 export interface GasPPluginOptions {
   srcDir: string;
+  entry?: string;
   endpoint?: string;
 }
 
@@ -64,7 +65,9 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
 
         // Fresh context per request, matching Apps Script's per-execution
         // model: no module-level state persists across calls.
-        const context = buildContext(options.srcDir);
+        const context = options.entry
+          ? await buildBundledContext(options.srcDir, options.entry)
+          : buildContext(options.srcDir);
         const result = handleRpcCall(context, parsed.fnName, parsed.args);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
