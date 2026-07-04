@@ -1,4 +1,4 @@
-import { buildContext, buildBundledContext } from '../core/context.js';
+import { buildContext, buildBundledContext, type ConsumerViteConfig } from '../core/context.js';
 import { handleRpcCall } from '../core/dispatch.js';
 import { renderDoGet, renderDoGetBundled } from '../core/harness.js';
 
@@ -23,6 +23,10 @@ interface ConnectMiddlewareStack {
 interface ViteDevServerLike {
   middlewares: ConnectMiddlewareStack;
   transformIndexHtml(url: string, html: string): Promise<string>;
+  config: {
+    resolve?: ConsumerViteConfig['resolve'];
+    plugins?: readonly { name?: string }[];
+  };
 }
 
 export interface GasPPluginOptions {
@@ -57,6 +61,16 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
   return {
     name: 'gas-p',
     configureServer(server: ViteDevServerLike) {
+      // Reuse the consumer's own resolved resolve/plugins config so the
+      // dev-time bundle resolves aliases/imports identically to their real
+      // `vite build` output. Exclude this plugin itself from the passed-in
+      // list — feeding it back into the nested build() call would register
+      // it against that inner build for no benefit and unclear side effects.
+      const consumerConfig: ConsumerViteConfig = {
+        resolve: server.config.resolve,
+        plugins: (server.config.plugins ?? []).filter((p) => p.name !== 'gas-p') as ConsumerViteConfig['plugins'],
+      };
+
       // No path filter and no returned callback: this runs on every request,
       // ahead of Vite's own HTML middleware, so a raw <?= ?> scriptlet
       // template is never handed to Vite's HTML parser as a plain entry file.
@@ -67,7 +81,7 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
         }
 
         const html = options.entry
-          ? await renderDoGetBundled(options.srcDir, options.entry)
+          ? await renderDoGetBundled(options.srcDir, options.entry, consumerConfig)
           : renderDoGet(options.srcDir);
         const transformed = await server.transformIndexHtml(req.url, html);
 
@@ -92,7 +106,7 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
         // Fresh context per request, matching Apps Script's per-execution
         // model: no module-level state persists across calls.
         const context = options.entry
-          ? await buildBundledContext(options.srcDir, options.entry)
+          ? await buildBundledContext(options.srcDir, options.entry, consumerConfig)
           : buildContext(options.srcDir);
         const result = handleRpcCall(context, parsed.fnName, parsed.args);
 

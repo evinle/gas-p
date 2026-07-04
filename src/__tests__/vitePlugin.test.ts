@@ -16,10 +16,11 @@ function fakeRequest(method: string, body: unknown, url = '/') {
   };
 }
 
-function fakeServer(use: ReturnType<typeof vi.fn>) {
+function fakeServer(use: ReturnType<typeof vi.fn>, config: Record<string, unknown> = {}) {
   return {
     middlewares: { use },
     transformIndexHtml: vi.fn(async (_url: string, html: string) => html + '<!--hmr-client-->'),
+    config: { resolve: {}, plugins: [], ...config },
   };
 }
 
@@ -72,6 +73,25 @@ describe('gasPVitePlugin', () => {
 
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ ok: true, value: 5 });
+  });
+
+  it("resolves an import against a path alias from the consumer's own resolved Vite config", async () => {
+    const aliasFixture = join(__dirname, '__fixtures__', 'context', 'consumer-config-alias');
+    const plugin = gasPVitePlugin({ srcDir: aliasFixture, entry: 'Code.ts', endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    const server = fakeServer(use, {
+      resolve: { alias: { '@utils': join(aliasFixture, 'Utils.ts') } },
+    });
+    plugin.configureServer(server);
+
+    const rpcCall = use.mock.calls.find((call) => call.length === 2);
+    const [, handler] = rpcCall!;
+    const req = fakeRequest('POST', { fnName: 'getGreeting', args: ['World'] });
+    const res = fakeResponse();
+    const next = vi.fn();
+    await handler(req, res, next);
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, value: 'Hello, World' });
   });
 
   it('serves doGet HTML for a GET / request, run through transformIndexHtml', async () => {

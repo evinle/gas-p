@@ -21,6 +21,14 @@ describe('buildBundledContext', () => {
     expect(sandbox.getGreeting('World')).toBe('Hello, World');
   });
 
+  it('resolves an import against a path alias from the consumer\'s own Vite config', async () => {
+    const dir = join(CONTEXT_FIXTURES, 'consumer-config-alias');
+    const sandbox = await buildBundledContext(dir, 'Code.ts', {
+      resolve: { alias: { '@utils': join(dir, 'Utils.ts') } },
+    });
+    expect(sandbox.getGreeting('World')).toBe('Hello, World');
+  });
+
   it('preserves an unreferenced, unexported top-level function as a callable global', async () => {
     // Apps Script functions like doGet are implicit globals with no export —
     // a bundler's tree-shaker/minifier sees an unreferenced top-level function

@@ -2,7 +2,13 @@ import vm from 'node:vm';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { build } from 'vite';
+import type { InlineConfig } from 'vite';
 import type { OutputChunk, RollupOutput } from 'rollup';
+
+export interface ConsumerViteConfig {
+  resolve?: InlineConfig['resolve'];
+  plugins?: InlineConfig['plugins'];
+}
 
 interface HtmlOutput {
   getContent(): string;
@@ -71,7 +77,16 @@ export function buildContext(srcDir: string): vm.Context {
 // Bundles `entry` (a .ts file with real imports) via Vite's build({ write: false })
 // API, then executes the result in the same isolated vm sandbox buildContext uses
 // for raw .gs/.js — same isolation/ReferenceError behavior either way.
-export async function buildBundledContext(srcDir: string, entry: string): Promise<vm.Context> {
+//
+// consumerConfig carries the resolve options/plugins from the *consumer's own*
+// already-resolved vite.config.ts (e.g. via server.config in configureServer),
+// so this dev-time bundle resolves aliases/imports identically to their real
+// `vite build` / `clasp push` artifact instead of a bare, config-less bundle.
+export async function buildBundledContext(
+  srcDir: string,
+  entry: string,
+  consumerConfig?: ConsumerViteConfig
+): Promise<vm.Context> {
   const sandbox = createSandbox(srcDir);
   sandbox.module = { exports: {} };
 
@@ -79,6 +94,8 @@ export async function buildBundledContext(srcDir: string, entry: string): Promis
     root: srcDir,
     configFile: false,
     logLevel: 'silent',
+    resolve: consumerConfig?.resolve,
+    plugins: consumerConfig?.plugins,
     build: {
       write: false,
       minify: false,

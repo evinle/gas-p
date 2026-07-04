@@ -1,4 +1,4 @@
-import { buildContext, buildBundledContext, isHtmlOutput } from './context.js';
+import { buildContext, buildBundledContext, isHtmlOutput, type ConsumerViteConfig } from './context.js';
 import type vm from 'node:vm';
 
 const HOST_ERROR_CONSTRUCTORS: Record<string, ErrorConstructor> = {
@@ -52,7 +52,11 @@ export function renderDoGet(srcDir: string): string {
   return invokeDoGet(context);
 }
 
-export async function renderDoGetBundled(srcDir: string, entry: string): Promise<string> {
-  const context = await buildBundledContext(srcDir, entry);
+export async function renderDoGetBundled(
+  srcDir: string,
+  entry: string,
+  consumerConfig?: ConsumerViteConfig
+): Promise<string> {
+  const context = await buildBundledContext(srcDir, entry, consumerConfig);
   return invokeDoGet(context);
 }
