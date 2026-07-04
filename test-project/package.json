@@ -11,7 +11,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "gas-p": "file:.."
+    "@evinle/gas-p": "file:.."
   },
   "devDependencies": {
     "@types/google-apps-script": "^2.0.11",

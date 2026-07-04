@@ -13,7 +13,7 @@ Your GAS source stays untouched: no imports from gas-p, no `await`, no coupling.
 ## Quick start
 
 ```bash
-npm install --save-dev gas-p
+npm install --save-dev @evinle/gas-p
 ```
 
 Add the Vite plugin to your project's `vite.config.ts`:
@@ -21,7 +21,7 @@ Add the Vite plugin to your project's `vite.config.ts`:
 ```ts
 import { defineConfig } from "vite";
 import { fileURLToPath } from "url";
-import { gasPVitePlugin } from "gas-p/vite";
+import { gasPVitePlugin } from "@evinle/gas-p/vite";
 
 const srcDir = fileURLToPath(new URL(".", import.meta.url));
 
@@ -45,7 +45,7 @@ Install the transport shim in your `index.html` (or client entry), before any co
 
 ```html
 <script type="module">
-  import { installTransportShim } from "gas-p/client";
+  import { installTransportShim } from "@evinle/gas-p/client";
   installTransportShim({ endpoint: "/__gasp/rpc" });
 </script>
 ```

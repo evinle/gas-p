@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import { fileURLToPath } from "url";
-import { gasPVitePlugin } from "gas-p/vite";
+import { gasPVitePlugin } from "@evinle/gas-p/vite";
 
 const srcDir = fileURLToPath(new URL(".", import.meta.url));
 
