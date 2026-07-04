@@ -1,6 +1,8 @@
-import { buildContext, buildBundledContext, type ConsumerViteConfig } from '../core/context.js';
+import { join } from 'node:path';
+import type { ConsumerViteConfig } from '../core/context.js';
 import { handleRpcCall } from '../core/dispatch.js';
-import { renderDoGet, renderDoGetBundled } from '../core/harness.js';
+import { resolveSource } from '../core/harness.js';
+import { loadGasPConfig } from '../core/config.js';
 
 interface RpcRequest {
   method?: string;
@@ -24,16 +26,18 @@ interface ViteDevServerLike {
   middlewares: ConnectMiddlewareStack;
   transformIndexHtml(url: string, html: string): Promise<string>;
   config: {
+    root: string;
     resolve?: ConsumerViteConfig['resolve'];
     plugins?: readonly { name?: string }[];
   };
 }
 
 export interface GasPPluginOptions {
-  srcDir: string;
+  srcDir?: string;
   entry?: string;
   endpoint?: string;
   page?: string;
+  configFile?: string;
 }
 
 function isRpcRequestBody(x: unknown): x is { fnName: string; args: unknown[] } {
@@ -60,7 +64,17 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
 
   return {
     name: 'gas-p',
-    configureServer(server: ViteDevServerLike) {
+    async configureServer(server: ViteDevServerLike) {
+      // Resolved once here, at server start — not per request. Explicit
+      // plugin options win; gas-p.config.ts is only consulted when srcDir
+      // isn't passed explicitly (port isn't read by this adapter — Vite's
+      // own server.port already owns that).
+      const fileConfig = options.srcDir
+        ? undefined
+        : await loadGasPConfig(options.configFile ?? join(server.config.root, 'gas-p.config.ts'));
+      const srcDir = options.srcDir ?? fileConfig!.srcDir;
+      const entry = options.entry ?? fileConfig?.entry;
+
       // Reuse the consumer's own resolved resolve/plugins config so the
       // dev-time bundle resolves aliases/imports identically to their real
       // `vite build` output. Exclude this plugin itself from the passed-in
@@ -70,6 +84,7 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
         resolve: server.config.resolve,
         plugins: (server.config.plugins ?? []).filter((p) => p.name !== 'gas-p') as ConsumerViteConfig['plugins'],
       };
+      const source = resolveSource(srcDir, entry, consumerConfig);
 
       // No path filter and no returned callback: this runs on every request,
       // ahead of Vite's own HTML middleware, so a raw <?= ?> scriptlet
@@ -80,9 +95,7 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
           return;
         }
 
-        const html = options.entry
-          ? await renderDoGetBundled(options.srcDir, options.entry, consumerConfig)
-          : renderDoGet(options.srcDir);
+        const html = await source.renderDoGet();
         const transformed = await server.transformIndexHtml(req.url, html);
 
         res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -105,9 +118,7 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
 
         // Fresh context per request, matching Apps Script's per-execution
         // model: no module-level state persists across calls.
-        const context = options.entry
-          ? await buildBundledContext(options.srcDir, options.entry, consumerConfig)
-          : buildContext(options.srcDir);
+        const context = await source.buildContext();
         const result = handleRpcCall(context, parsed.fnName, parsed.args);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });

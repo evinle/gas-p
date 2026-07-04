@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
-import { renderDoGet, renderDoGetBundled } from '../core/harness.js';
+import { renderDoGet, renderDoGetBundled, resolveSource } from '../core/harness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, '__fixtures__', 'harness');
@@ -62,5 +62,21 @@ describe('renderDoGetBundled', () => {
     const dir = join(CONTEXT_FIXTURES, 'undeclared-global');
     await expect(renderDoGetBundled(dir, 'Code.ts')).rejects.toThrow(ReferenceError);
     await expect(renderDoGetBundled(dir, 'Code.ts')).rejects.toThrow(/someUndeclaredService is not defined/);
+  });
+});
+
+describe('resolveSource', () => {
+  it('uses the raw .gs/.js path when entry is undefined', async () => {
+    const source = resolveSource(join(FIXTURES, 'plain-html'), undefined);
+    const html = await source.renderDoGet();
+    expect(html).toBe(
+      ['<html>', '  <body>', '    <h1>Hello gas-p</h1>', '  </body>', '</html>', ''].join('\n')
+    );
+  });
+
+  it('uses the bundled .ts path when entry is given', async () => {
+    const source = resolveSource(join(CONTEXT_FIXTURES, 'multi-file-import'), 'Code.ts');
+    const context = await source.buildContext();
+    expect(context.getGreeting('World')).toBe('Hello, World');
   });
 });

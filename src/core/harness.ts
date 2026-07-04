@@ -60,3 +60,25 @@ export async function renderDoGetBundled(
   const context = await buildBundledContext(srcDir, entry, consumerConfig);
   return invokeDoGet(context);
 }
+
+export interface GasPSource {
+  buildContext(): Promise<vm.Context>;
+  renderDoGet(): Promise<string>;
+}
+
+// Normalizes the raw .gs/.js (buildContext/renderDoGet) and bundled .ts
+// (buildBundledContext/renderDoGetBundled) pairs behind one interface, so
+// callers (Vite plugin today, any future adapter) branch on entry presence
+// exactly once instead of repeating the same ternary at every call site.
+export function resolveSource(srcDir: string, entry: string | undefined, consumerConfig?: ConsumerViteConfig): GasPSource {
+  if (entry) {
+    return {
+      buildContext: () => buildBundledContext(srcDir, entry, consumerConfig),
+      renderDoGet: () => renderDoGetBundled(srcDir, entry, consumerConfig),
+    };
+  }
+  return {
+    buildContext: () => Promise.resolve(buildContext(srcDir)),
+    renderDoGet: () => Promise.resolve(renderDoGet(srcDir)),
+  };
+}

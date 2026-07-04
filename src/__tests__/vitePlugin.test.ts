@@ -20,7 +20,7 @@ function fakeServer(use: ReturnType<typeof vi.fn>, config: Record<string, unknow
   return {
     middlewares: { use },
     transformIndexHtml: vi.fn(async (_url: string, html: string) => html + '<!--hmr-client-->'),
-    config: { resolve: {}, plugins: [], ...config },
+    config: { resolve: {}, plugins: [], root: __dirname, ...config },
   };
 }
 
@@ -92,6 +92,22 @@ describe('gasPVitePlugin', () => {
     await handler(req, res, next);
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, value: 'Hello, World' });
+  });
+
+  it('loads srcDir from gas-p.config.ts when no srcDir is passed in plugin options', async () => {
+    const projectRoot = join(__dirname, '__fixtures__', 'vite-plugin-config');
+    const plugin = gasPVitePlugin({ endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    await plugin.configureServer(fakeServer(use, { root: projectRoot }));
+
+    const rpcCall = use.mock.calls.find((call) => call.length === 2);
+    const [, handler] = rpcCall!;
+    const req = fakeRequest('POST', { fnName: 'add', args: [2, 3] });
+    const res = fakeResponse();
+    const next = vi.fn();
+    await handler(req, res, next);
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, value: 5 });
   });
 
   it('serves doGet HTML for a GET / request, run through transformIndexHtml', async () => {
