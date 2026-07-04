@@ -33,6 +33,15 @@ describe('buildContext', () => {
     expect(sandbox.CacheService.getScriptCache().get('key1')).toBe('value1');
   });
 
+  it('exposes PropertiesService as a sandbox global with no services option needed', () => {
+    // Only checks reachability, without calling getScriptProperties() — doing
+    // so would write a gas-p.properties.json into this committed fixture dir.
+    // PropertiesService.test.ts covers read/write behavior against a scratch copy.
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = buildContext(dir);
+    expect(typeof sandbox.PropertiesService.getScriptProperties).toBe('function');
+  });
+
   it('exposes Session as a sandbox global, gated by the services option', () => {
     const dir = join(SESSION_FIXTURES, 'basic');
     const sandbox = buildContext(dir, {

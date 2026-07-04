@@ -8,6 +8,7 @@ import { createCalendarApp } from '../shims/CalendarApp.js';
 import { Utilities } from '../shims/Utilities.js';
 import { CacheService } from '../shims/CacheService.js';
 import { createSession } from '../shims/Session.js';
+import { createPropertiesService } from '../shims/PropertiesService.js';
 
 export interface ServiceOptions {
   credentialsPath: string;
@@ -66,6 +67,7 @@ function createSandbox(srcDir: string, services?: ServiceOptions): vm.Context {
   sandbox.HtmlService = buildHtmlService(srcDir, sandbox);
   sandbox.Utilities = Utilities;
   sandbox.CacheService = CacheService;
+  sandbox.PropertiesService = createPropertiesService(srcDir);
   if (services) {
     sandbox.CalendarApp = createCalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
     sandbox.Session = createSession(services.credentialsPath, services.clientSecretPath, srcDir);

@@ -192,4 +192,17 @@ describe('gasPVitePlugin', () => {
     await handler(tzReq, tzRes, vi.fn());
     expect(JSON.parse(tzRes.body)).toEqual({ ok: true, value: 'America/New_York' });
   });
+
+  it('reaches PropertiesService from a dispatched .gs call over the RPC path', async () => {
+    const fixture = join(FIXTURES, 'properties');
+    const plugin = gasPVitePlugin({ srcDir: fixture, endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    plugin.configureServer(fakeServer(use));
+    const [, handler] = use.mock.calls.find((call) => call.length === 2)!;
+
+    const req = fakeRequest('POST', { fnName: 'getOrgId', args: [] });
+    const res = fakeResponse();
+    await handler(req, res, vi.fn());
+    expect(JSON.parse(res.body)).toEqual({ ok: true, value: 'org-789' });
+  });
 });
