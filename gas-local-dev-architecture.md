@@ -79,6 +79,59 @@ vm.runInContext(fileContents, sandbox, { filename });
   `HtmlService`. (Note: this is a small templating engine of its own —
   budget it as such.)
 
+### `.ts` source: bundle before execution (scope addition, #19)
+
+`buildContext()` above only covers raw `.gs`/`.js` — no bundler runs anywhere
+in that path. Real projects are authored as multi-file `.ts` with genuine
+`import`s between files (already bundled today via Vite before `clasp push`),
+which `vm.runInContext` cannot resolve on its own. A resolve/bundle step must
+run ahead of execution for that case.
+
+**Decision:** bundle via Vite's `build({ write: false })` API, reusing the
+consumer's own resolved Vite config, then execute the resulting string in the
+same isolated `vm` sandbox already used for `.gs`. Deliberately **not**
+`ssrLoadModule` or the Environment API's Module Runner — both execute in real
+Node module scope (ambient `process`/`require`/etc.), which would let dev
+code silently use capabilities that don't exist in real Apps Script (a
+dev/prod fidelity leak).
+
+- **Entry-point config** — an explicit entry field (e.g. `entry` in
+  `gas-p.config.ts`) rather than inferring source files from a directory
+  scan; bundling needs one deterministic entry point.
+- **Config passthrough** — seed the programmatic `build()` call from the
+  consumer's own resolved Vite config (`server.config`: aliases, resolve
+  options, other plugins) so the dev-time bundle resolves imports identically
+  to the real `vite build` / `clasp push` artifact.
+- **Output format: `cjs`, not `iife`/`esm`.** `iife` wraps the whole bundle in
+  `(function(){...})()`, hiding top-level declarations from the sandbox
+  (breaks `doGet` being visible as a literal global). `esm` keeps `export`
+  statements that `vm.runInContext` can't execute (no module loader in a
+  `vm` context). `cjs` keeps top-level declarations un-wrapped and only
+  appends `module.exports.x = ...` lines for anything actually exported —
+  stub `sandbox.module = { exports: {} }` before running so those lines
+  don't throw.
+- **Tree-shaking/minification will silently delete trigger functions unless
+  disabled — verified empirically, not documented behavior.** Apps Script
+  functions (`doGet`, `getGreeting`, ...) are implicit globals with no
+  `export`; both Rollup's tree-shaker and Vite's default esbuild minifier
+  treat an unreferenced, unexported top-level function as dead code and
+  silently drop it. Reproduced with a real two-file `.ts` fixture: neither
+  `build.minify: false` alone nor `rollupOptions.treeshake: false` alone was
+  sufficient — **both** are required together, or `doGet` vanishes from the
+  bundle with no error (surfaces later as a confusing `doGet is not defined`
+  from the harness). Non-negotiable build options: `minify: false` and
+  `rollupOptions.treeshake: false`.
+- **Feed into the existing sandbox** — run the bundled string through the
+  same `vm.runInContext(bundleString, sandbox)` `context.ts` already uses for
+  `.gs`; the isolation/`ReferenceError` behavior itself doesn't change.
+- **Bundle timing** — per-request bundling to start, for correctness;
+  revisit caching + watcher-driven invalidation (#23) only if latency
+  becomes a measured problem.
+- **Chunk return shape** — `build({ write: false })`'s output array entries
+  expose the bundled source on `.code` (confirmed against the pinned Vite
+  version by direct probe, not just the docs, since `build.write`'s return
+  shape isn't part of Vite's documented public API).
+
 ---
 
 ## 3. Service Layer
@@ -163,6 +216,62 @@ Vite's existing WS channel on `.gs` changes. Same-origin (no CORS), single
 can take down the dev server — mitigated with call timeouts; standalone mode
 is the isolation fallback.
 
+The plugin serves two structurally different request types over that one
+middleware stack — don't conflate them:
+
+1. **Page load (`doGet`)** — a plain GET, fires once per navigation, returns
+   `text/html`. The only channel that returns HTML.
+2. **RPC (`google.script.run.fn()`)** — fires repeatedly *after* the page
+   loads, POSTs to the RPC endpoint, returns serialized data, never HTML.
+   (Implemented — see Transport Shim / core/dispatch.js above.)
+
+**Page-load wiring (not yet implemented as of this writing — `vitePlugin.ts`
+only mounts the RPC middleware today):**
+
+For the page-load channel, the plugin must serve complete HTML on every
+request with no build artifact to serve from in watch mode — the same
+problem Vite's own SSR dev mode solves. The reframe: **never assemble a
+bundle in dev.** The browser builds the module tree itself by following
+`import`s; Vite transforms each module per-request. The plugin's only jobs
+are (a) emit entry HTML with the right script tags + HMR client, and (b)
+provide runnable versions of any Node-side supporting modules.
+
+Request flow:
+
+```
+raw HTML template  (contains <?= ?> and <script type=module src=/src/main.ts>)
+      │
+      ▼  harness: run doGet(e), resolve scriptlets against .gs/.ts via vm
+resolved HTML string
+      │
+      ▼  server.transformIndexHtml(url, html)   → injects HMR client, rewrites script tags
+served HTML
+      │
+      ▼  browser fetches /src/main.ts → Vite middleware transforms it lazily → walks the import tree
+```
+
+- `server.transformIndexHtml(url, htmlString)` takes the scriptlet-evaluated
+  HTML **string** produced by `doGet` and returns HTML with the HMR client
+  injected and plugin HTML transforms applied — the dev equivalent of "the
+  HTML the build would have emitted."
+- `.gs`/`.ts` source stays on the raw `vm` harness (never
+  `ssrLoadModule`/Module Runner — see the fidelity-leak rationale above);
+  `ssrLoadModule` is only for supporting Node-side JS/TS outside that source.
+- Middleware must be registered **inside** `configureServer`, ordered before
+  Vite's built-in HTML middleware, or Vite's parser may choke trying to treat
+  a raw `<?= ?>` template as a plain HTML entry.
+- Scriptlet-evaluated templates live outside Vite's module graph, so editing
+  them won't trigger HMR on their own — extend the file watcher to watch
+  templates and fire a full-reload (`server.ws.send({ type: 'full-reload' })`
+  or a custom `gas-dev:reload` event) when they change.
+
+On the real wire, RPC responses carry Google's `)]}'` XSSI prefix and an
+internal `[["op-exec", ...]]` envelope; since the shim and backend are a
+matched pair we own both ends of, we deliberately don't replicate that
+envelope — plain JSON over `fetch` POST is fine. Only the developer-visible
+semantics (deserialized value in the handler, `undefined`→`null`, stripped
+error shape) need to match, and those already live in the transport shim.
+
 **Standalone server (fallback):** Express exposing `POST /api/:fn`,
 optionally serving static FE assets. `gas-dev serve` (all-in-one) or
 `gas-dev serve --api-only` (bring your own FE tooling; consumer handles
@@ -217,9 +326,17 @@ generic Write Queue or Resource Cache).
       `appsscript.json`, credentials at `~/.gas-p/credentials.json`
       (unchanged from the prior design). Service account auth deferred to a
       CI-focused follow-up.
-- [ ] Finalize config schema for v1: `srcDir`, `entryFunctions`, `mode`
+- [ ] Finalize config schema for v1: `srcDir`, `entry` (deterministic
+      bundle entry point for `.ts` source — see Runtime Harness), `mode`
       (included now for forward compatibility, always `"live"` in v1),
       `devResourceIds`, `port`. `fixtures` is **not** in the v1 schema.
+- [ ] **`.ts` multi-file bundling** — `build({ write: false })` step ahead of
+      `vm.runInContext`, `cjs` output, `minify: false` +
+      `rollupOptions.treeshake: false` (see Runtime Harness — scope addition
+      landed on #19 mid-implementation).
+- [ ] **Page-load wiring in the Vite plugin** — `doGet` → scriptlet harness →
+      `server.transformIndexHtml` is designed (see Adapters) but not yet
+      implemented; `vitePlugin.ts` currently only mounts the RPC middleware.
 - [ ] Container-bound API guard errors ("out of scope — use openById()").
 - [ ] `PropertiesService` stays local-file-backed (`gas-p.properties.json`,
       seeded via `gas-p pull-properties`) rather than routing through Live
