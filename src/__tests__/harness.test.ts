@@ -30,6 +30,13 @@ describe('renderDoGet', () => {
     expect(html).toBe('<p>Hello, World!</p>\n');
   });
 
+  it('renders a plain HtmlOutput from createHtmlOutputFromFile().setTitle(), matching the real v-reimburse doGet() pattern', () => {
+    const html = renderDoGet(join(FIXTURES, 'html-output'));
+    expect(html).toBe(
+      ['<html>', '  <body>', '    <h1>VReimbursement Portal</h1>', '  </body>', '</html>', ''].join('\n')
+    );
+  });
+
   it('does not persist module-level state across separate renderDoGet calls', () => {
     const counterDir = join(FIXTURES, 'counter');
     const first = renderDoGet(counterDir);

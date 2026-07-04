@@ -9,6 +9,7 @@ import { Utilities } from '../shims/Utilities.js';
 import { CacheService } from '../shims/CacheService.js';
 import { createSession } from '../shims/Session.js';
 import { createPropertiesService } from '../shims/PropertiesService.js';
+import { buildHtmlService, isHtmlOutput, type HtmlOutput } from '../shims/HtmlService.js';
 
 export interface ServiceOptions {
   credentialsPath: string;
@@ -19,46 +20,6 @@ export interface ServiceOptions {
 export interface ConsumerViteConfig {
   resolve?: InlineConfig['resolve'];
   plugins?: InlineConfig['plugins'];
-}
-
-interface HtmlOutput {
-  getContent(): string;
-}
-
-function isHtmlOutput(x: unknown): x is HtmlOutput {
-  if (typeof x !== 'object' || x === null) return false;
-  if (!('getContent' in x)) return false;
-  return typeof Reflect.get(x, 'getContent') === 'function';
-}
-
-const SCRIPTLET_PATTERN = /<\?(=|!=|#)([\s\S]*?)\?>/g;
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function evaluateTemplate(raw: string, context: vm.Context): string {
-  return raw.replace(SCRIPTLET_PATTERN, (_match, tag: string, expr: string) => {
-    if (tag === '#') return '';
-    const value = String(vm.runInContext(expr, context));
-    return tag === '=' ? escapeHtml(value) : value;
-  });
-}
-
-function buildHtmlService(srcDir: string, context: vm.Context) {
-  return {
-    createTemplateFromFile(filename: string) {
-      const raw = readFileSync(join(srcDir, `${filename}.html`), 'utf-8');
-      return {
-        evaluate(): HtmlOutput {
-          return { getContent: () => evaluateTemplate(raw, context) };
-        },
-      };
-    },
-  };
 }
 
 function createSandbox(srcDir: string, services?: ServiceOptions): vm.Context {
