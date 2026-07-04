@@ -10,6 +10,8 @@ import { CacheService } from '../shims/CacheService.js';
 import { createSession } from '../shims/Session.js';
 import { createPropertiesService } from '../shims/PropertiesService.js';
 import { buildHtmlService, isHtmlOutput, type HtmlOutput } from '../shims/HtmlService.js';
+import { UrlFetchApp } from '../shims/UrlFetchApp.js';
+import { Logger } from '../shims/Logger.js';
 
 export interface ServiceOptions {
   credentialsPath: string;
@@ -29,6 +31,8 @@ function createSandbox(srcDir: string, services?: ServiceOptions, htmlDir?: stri
   sandbox.Utilities = Utilities;
   sandbox.CacheService = CacheService;
   sandbox.PropertiesService = createPropertiesService(srcDir);
+  sandbox.UrlFetchApp = UrlFetchApp;
+  sandbox.Logger = Logger;
   if (services) {
     sandbox.CalendarApp = createCalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
     sandbox.Session = createSession(services.credentialsPath, services.clientSecretPath, srcDir);

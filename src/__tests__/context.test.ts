@@ -33,6 +33,13 @@ describe('buildContext', () => {
     expect(sandbox.CacheService.getScriptCache().get('key1')).toBe('value1');
   });
 
+  it('exposes UrlFetchApp and Logger as sandbox globals with no services option needed', () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = buildContext(dir);
+    expect(typeof sandbox.UrlFetchApp.fetch).toBe('function');
+    expect(typeof sandbox.Logger.log).toBe('function');
+  });
+
   it('exposes PropertiesService as a sandbox global with no services option needed', () => {
     // Only checks reachability, without calling getScriptProperties() — doing
     // so would write a gas-p.properties.json into this committed fixture dir.
