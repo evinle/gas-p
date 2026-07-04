@@ -50,6 +50,15 @@ describe('buildContext', () => {
     });
     expect(sandbox.Session.getScriptTimeZone()).toBe('America/New_York');
   });
+
+  it('reads HtmlOutput/template files from htmlDir instead of srcDir when htmlDir is given', () => {
+    const dir = join(CONTEXT_FIXTURES, 'html-dir-override', 'entry');
+    const htmlDir = join(CONTEXT_FIXTURES, 'html-dir-override', 'views');
+    const sandbox = buildContext(dir, undefined, htmlDir);
+    expect(sandbox.HtmlService.createHtmlOutputFromFile('index').getContent()).toBe(
+      '<p>from the views dir, not the entry dir</p>\n'
+    );
+  });
 });
 
 describe('buildBundledContext', () => {
@@ -74,5 +83,14 @@ describe('buildBundledContext', () => {
     const dir = join(CONTEXT_FIXTURES, 'unreferenced-toplevel-fn');
     const sandbox = await buildBundledContext(dir, 'Code.ts');
     expect(sandbox.doGet()).toBe('unused by anything else in this bundle');
+  });
+
+  it('reads HtmlOutput/template files from htmlDir instead of srcDir when htmlDir is given', async () => {
+    const dir = join(CONTEXT_FIXTURES, 'html-dir-override', 'entry-ts');
+    const htmlDir = join(CONTEXT_FIXTURES, 'html-dir-override', 'views');
+    const sandbox = await buildBundledContext(dir, 'Code.ts', undefined, undefined, htmlDir);
+    expect(sandbox.HtmlService.createHtmlOutputFromFile('index').getContent()).toBe(
+      '<p>from the views dir, not the entry dir</p>\n'
+    );
   });
 });

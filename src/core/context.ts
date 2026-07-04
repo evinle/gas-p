@@ -22,10 +22,10 @@ export interface ConsumerViteConfig {
   plugins?: InlineConfig['plugins'];
 }
 
-function createSandbox(srcDir: string, services?: ServiceOptions): vm.Context {
+function createSandbox(srcDir: string, services?: ServiceOptions, htmlDir?: string): vm.Context {
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
-  sandbox.HtmlService = buildHtmlService(srcDir, sandbox);
+  sandbox.HtmlService = buildHtmlService(htmlDir ?? srcDir, sandbox);
   sandbox.Utilities = Utilities;
   sandbox.CacheService = CacheService;
   sandbox.PropertiesService = createPropertiesService(srcDir);
@@ -38,8 +38,8 @@ function createSandbox(srcDir: string, services?: ServiceOptions): vm.Context {
 
 // Builds a fresh vm context per call, matching Apps Script's per-execution
 // model: no module-level state persists across separate buildContext calls.
-export function buildContext(srcDir: string, services?: ServiceOptions): vm.Context {
-  const sandbox = createSandbox(srcDir, services);
+export function buildContext(srcDir: string, services?: ServiceOptions, htmlDir?: string): vm.Context {
+  const sandbox = createSandbox(srcDir, services, htmlDir);
 
   const sourceFiles = readdirSync(srcDir).filter((f) => extname(f) === '.gs' || extname(f) === '.js');
   if (sourceFiles.length === 0) {
@@ -65,9 +65,10 @@ export async function buildBundledContext(
   srcDir: string,
   entry: string,
   consumerConfig?: ConsumerViteConfig,
-  services?: ServiceOptions
+  services?: ServiceOptions,
+  htmlDir?: string
 ): Promise<vm.Context> {
-  const sandbox = createSandbox(srcDir, services);
+  const sandbox = createSandbox(srcDir, services, htmlDir);
   sandbox.module = { exports: {} };
 
   const result = await build({

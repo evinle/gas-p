@@ -170,6 +170,24 @@ describe('gasPVitePlugin', () => {
     expect(res.body).toContain('<!--hmr-client-->');
   });
 
+  it('serves doGet HTML read from htmlDir instead of srcDir, for bundled .ts entries whose HTML lives elsewhere', async () => {
+    const entryFixture = join(__dirname, '__fixtures__', 'vite-plugin-html-dir', 'entry');
+    const htmlDir = join(__dirname, '__fixtures__', 'vite-plugin-html-dir', 'views');
+    const plugin = gasPVitePlugin({ srcDir: entryFixture, entry: 'Code.ts', htmlDir, endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    const server = fakeServer(use);
+    plugin.configureServer(server);
+
+    const pageHandlerCall = use.mock.calls.find((call) => call.length === 1);
+    const [pageHandler] = pageHandlerCall!;
+
+    const req = fakeRequest('GET', undefined, '/');
+    const res = fakeResponse();
+    await pageHandler(req, res, vi.fn());
+
+    expect(server.transformIndexHtml).toHaveBeenCalledWith('/', '<p>from the vite-plugin views dir</p>\n');
+  });
+
   it('reaches Utilities and Session from a dispatched .gs call over the RPC path', async () => {
     const fixture = join(FIXTURES, 'utilities-session');
     const plugin = gasPVitePlugin({

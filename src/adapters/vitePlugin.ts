@@ -39,6 +39,7 @@ export interface GasPPluginOptions {
   endpoint?: string;
   page?: string;
   configFile?: string;
+  htmlDir?: string;
   credentialsPath?: string;
   clientSecretPath?: string;
   devResourceIds?: Record<string, string[]>;
@@ -103,7 +104,7 @@ export function gasPVitePlugin(options: GasPPluginOptions) {
         resolve: server.config.resolve,
         plugins: (server.config.plugins ?? []).filter(isConsumerPlugin) as ConsumerViteConfig['plugins'],
       };
-      const source = resolveSource(srcDir, entry, consumerConfig, services);
+      const source = resolveSource(srcDir, entry, consumerConfig, services, options.htmlDir);
 
       // No path filter and no returned callback: this runs on every request,
       // ahead of Vite's own HTML middleware, so a raw <?= ?> scriptlet

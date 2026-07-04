@@ -70,6 +70,13 @@ describe('renderDoGetBundled', () => {
     await expect(renderDoGetBundled(dir, 'Code.ts')).rejects.toThrow(ReferenceError);
     await expect(renderDoGetBundled(dir, 'Code.ts')).rejects.toThrow(/someUndeclaredService is not defined/);
   });
+
+  it('reads HtmlOutput files from htmlDir instead of srcDir when htmlDir is given', async () => {
+    const dir = join(CONTEXT_FIXTURES, 'html-dir-override', 'entry-ts');
+    const htmlDir = join(CONTEXT_FIXTURES, 'html-dir-override', 'views');
+    const html = await renderDoGetBundled(dir, 'Code.ts', undefined, undefined, htmlDir);
+    expect(html).toBe('<p>from the views dir, not the entry dir</p>\n');
+  });
 });
 
 describe('resolveSource', () => {
@@ -85,5 +92,13 @@ describe('resolveSource', () => {
     const source = resolveSource(join(CONTEXT_FIXTURES, 'multi-file-import'), 'Code.ts');
     const context = await source.buildContext();
     expect(context.getGreeting('World')).toBe('Hello, World');
+  });
+
+  it('threads htmlDir through to the bundled .ts path', async () => {
+    const dir = join(CONTEXT_FIXTURES, 'html-dir-override', 'entry-ts');
+    const htmlDir = join(CONTEXT_FIXTURES, 'html-dir-override', 'views');
+    const source = resolveSource(dir, 'Code.ts', undefined, undefined, htmlDir);
+    const html = await source.renderDoGet();
+    expect(html).toBe('<p>from the views dir, not the entry dir</p>\n');
   });
 });

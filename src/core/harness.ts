@@ -47,8 +47,8 @@ function invokeDoGet(context: vm.Context): string {
   }
 }
 
-export function renderDoGet(srcDir: string, services?: ServiceOptions): string {
-  const context = buildContext(srcDir, services);
+export function renderDoGet(srcDir: string, services?: ServiceOptions, htmlDir?: string): string {
+  const context = buildContext(srcDir, services, htmlDir);
   return invokeDoGet(context);
 }
 
@@ -56,9 +56,10 @@ export async function renderDoGetBundled(
   srcDir: string,
   entry: string,
   consumerConfig?: ConsumerViteConfig,
-  services?: ServiceOptions
+  services?: ServiceOptions,
+  htmlDir?: string
 ): Promise<string> {
-  const context = await buildBundledContext(srcDir, entry, consumerConfig, services);
+  const context = await buildBundledContext(srcDir, entry, consumerConfig, services, htmlDir);
   return invokeDoGet(context);
 }
 
@@ -75,16 +76,17 @@ export function resolveSource(
   srcDir: string,
   entry: string | undefined,
   consumerConfig?: ConsumerViteConfig,
-  services?: ServiceOptions
+  services?: ServiceOptions,
+  htmlDir?: string
 ): GasPSource {
   if (entry) {
     return {
-      buildContext: () => buildBundledContext(srcDir, entry, consumerConfig, services),
-      renderDoGet: () => renderDoGetBundled(srcDir, entry, consumerConfig, services),
+      buildContext: () => buildBundledContext(srcDir, entry, consumerConfig, services, htmlDir),
+      renderDoGet: () => renderDoGetBundled(srcDir, entry, consumerConfig, services, htmlDir),
     };
   }
   return {
-    buildContext: () => Promise.resolve(buildContext(srcDir, services)),
-    renderDoGet: () => Promise.resolve(renderDoGet(srcDir, services)),
+    buildContext: () => Promise.resolve(buildContext(srcDir, services, htmlDir)),
+    renderDoGet: () => Promise.resolve(renderDoGet(srcDir, services, htmlDir)),
   };
 }
