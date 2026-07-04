@@ -156,8 +156,8 @@ export async function runAuthFlow(client: ClientSecret, scopes: string[]): Promi
   const redirectUri = `http://localhost:${port}`;
   const oauth2Client = new google.auth.OAuth2(client.clientId, client.clientSecret, redirectUri);
   const authUrl = oauth2Client.generateAuthUrl({ access_type: 'offline', scope: scopes });
-  console.log('Opening browser for authentication...');
-  open(authUrl).catch(() => console.log(`Open this URL manually:\n${authUrl}`));
+  console.log(`Opening browser for authentication...\nIf it opens the wrong browser/profile, open this URL manually:\n${authUrl}`);
+  open(authUrl).catch(() => {});
   const code = await awaitCode();
   close();
   const { tokens } = await oauth2Client.getToken(code);
