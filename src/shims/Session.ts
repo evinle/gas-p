@@ -2,7 +2,8 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { runInSubprocess } from '../core/subprocessBridge.js';
 import { buildGoogleAuthPreamble } from '../core/googleAuthScript.js';
-import { GasPNotImplementedError } from '../errors.js';
+import { SessionStubs } from './generated/Session.stubs.js';
+import { UserStubs } from './generated/User.stubs.js';
 
 interface Manifest {
   timeZone: string;
@@ -51,26 +52,23 @@ function fetchActiveUserEmail(credentialsPath: string, clientSecretPath: string)
   return raw.email;
 }
 
+function createUser(email: string) {
+  return {
+    ...UserStubs,
+    getEmail(): string {
+      return email;
+    },
+  };
+}
+
 export function createSession(credentialsPath: string, clientSecretPath: string, srcDir: string) {
   return {
+    ...SessionStubs,
     getScriptTimeZone(): string {
       return readTimeZone(srcDir);
     },
     getActiveUser() {
-      return {
-        getEmail(): string {
-          return fetchActiveUserEmail(credentialsPath, clientSecretPath);
-        },
-      };
-    },
-    getEffectiveUser(): never {
-      throw new GasPNotImplementedError('Session', 'getEffectiveUser');
-    },
-    getActiveUserLocale(): never {
-      throw new GasPNotImplementedError('Session', 'getActiveUserLocale');
-    },
-    getTemporaryActiveUserKey(): never {
-      throw new GasPNotImplementedError('Session', 'getTemporaryActiveUserKey');
+      return createUser(fetchActiveUserEmail(credentialsPath, clientSecretPath));
     },
   };
 }

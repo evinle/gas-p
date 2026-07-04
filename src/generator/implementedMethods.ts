@@ -33,6 +33,14 @@ function scanObjectLiteralMembers(
       const name = prop.name.text;
       const fn = functionDecls.get(name);
       if (!fn || !bodyIsStub(fn.body)) implemented.add(name);
+    } else if (
+      ts.isPropertyAssignment(prop) &&
+      ts.isIdentifier(prop.name) &&
+      (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))
+    ) {
+      const body = prop.initializer.body;
+      const isStub = ts.isBlock(body) && bodyIsStub(body);
+      if (!isStub) implemented.add(prop.name.text);
     }
   }
 }
@@ -48,18 +56,57 @@ function findClassScope(sourceFile: ts.SourceFile, name: string): ts.ClassDeclar
   return found;
 }
 
-function findReturnedObjectLiteral(fn: ts.FunctionDeclaration): ts.ObjectLiteralExpression | undefined {
+function isFunctionLikeNode(node: ts.Node): boolean {
+  return (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isGetAccessor(node) ||
+    ts.isSetAccessor(node)
+  );
+}
+
+function findLocalObjectLiteralVariable(scope: ts.Node, name: string): ts.ObjectLiteralExpression | undefined {
   let found: ts.ObjectLiteralExpression | undefined;
   function visit(node: ts.Node): void {
     if (found) return;
-    if (ts.isReturnStatement(node) && node.expression && ts.isObjectLiteralExpression(node.expression)) {
-      found = node.expression;
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer &&
+      ts.isObjectLiteralExpression(node.initializer)
+    ) {
+      found = node.initializer;
       return;
     }
+    if (node !== scope && isFunctionLikeNode(node)) return;
+    ts.forEachChild(node, visit);
+  }
+  visit(scope);
+  return found;
+}
+
+function findReturnedObjectLiteral(fn: ts.FunctionDeclaration): ts.ObjectLiteralExpression | undefined {
+  let returnExpr: ts.Expression | undefined;
+  function visit(node: ts.Node): void {
+    if (returnExpr) return;
+    if (ts.isReturnStatement(node) && node.expression) {
+      returnExpr = node.expression;
+      return;
+    }
+    if (node !== fn.body && isFunctionLikeNode(node)) return;
     ts.forEachChild(node, visit);
   }
   if (fn.body) visit(fn.body);
-  return found;
+  if (!returnExpr) return undefined;
+
+  if (ts.isObjectLiteralExpression(returnExpr)) return returnExpr;
+  if (ts.isIdentifier(returnExpr) && fn.body) {
+    return findLocalObjectLiteralVariable(fn.body, returnExpr.text);
+  }
+  return undefined;
 }
 
 function findFactoryReturnObject(sourceFile: ts.SourceFile, scopeName: string): ts.ObjectLiteralExpression | undefined {

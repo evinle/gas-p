@@ -1,7 +1,9 @@
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { GasPNotImplementedError } from '../errors.js';
+import { HtmlServiceStubs } from './generated/HtmlService.stubs.js';
+import { HtmlOutputStubs } from './generated/HtmlOutput.stubs.js';
+import { HtmlTemplateStubs } from './generated/HtmlTemplate.stubs.js';
 
 export interface HtmlOutput {
   getContent(): string;
@@ -36,53 +38,45 @@ function evaluateTemplate(raw: string, context: vm.Context): string {
   });
 }
 
-function makeHtmlOutput(content: string): HtmlOutput {
+function createHtmlOutput(content: string): HtmlOutput {
   let title: string | undefined;
   const output: HtmlOutput = {
+    ...HtmlOutputStubs,
     getContent: () => content,
     getTitle: () => title,
     setTitle(newTitle: string): HtmlOutput {
       title = newTitle;
       return output;
     },
-    append(): never {
-      throw new GasPNotImplementedError('HtmlOutput', 'append');
-    },
-    addMetaTag(): never {
-      throw new GasPNotImplementedError('HtmlOutput', 'addMetaTag');
-    },
-    setFaviconUrl(): never {
-      throw new GasPNotImplementedError('HtmlOutput', 'setFaviconUrl');
-    },
-    setXFrameOptionsMode(): never {
-      throw new GasPNotImplementedError('HtmlOutput', 'setXFrameOptionsMode');
-    },
   };
   return output;
+}
+
+function createHtmlTemplate(raw: string, context: vm.Context) {
+  return {
+    ...HtmlTemplateStubs,
+    evaluate(): HtmlOutput {
+      return { getContent: () => evaluateTemplate(raw, context) };
+    },
+  };
 }
 
 // createTemplateFromFile's evaluate() needs a live reference to the sandbox's
 // own vm.Context to run <?= ?> scriptlet expressions against the script's own
 // globals — unlike the rest of this shim, it can't be decoupled from the vm.
-export function buildHtmlService(srcDir: string, context: vm.Context) {
+export function createHtmlService(srcDir: string, context: vm.Context) {
   return {
+    ...HtmlServiceStubs,
     createTemplateFromFile(filename: string) {
       const raw = readFileSync(join(srcDir, `${filename}.html`), 'utf-8');
-      return {
-        evaluate(): HtmlOutput {
-          return { getContent: () => evaluateTemplate(raw, context) };
-        },
-      };
+      return createHtmlTemplate(raw, context);
     },
     createHtmlOutputFromFile(filename: string): HtmlOutput {
       const content = readFileSync(join(srcDir, `${filename}.html`), 'utf-8');
-      return makeHtmlOutput(content);
+      return createHtmlOutput(content);
     },
     createHtmlOutput(html = ''): HtmlOutput {
-      return makeHtmlOutput(html);
-    },
-    createTemplate(): never {
-      throw new GasPNotImplementedError('HtmlService', 'createTemplate');
+      return createHtmlOutput(html);
     },
   };
 }

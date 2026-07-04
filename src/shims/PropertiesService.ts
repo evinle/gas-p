@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { GasPNotImplementedError } from '../errors.js';
+import { PropertiesStubs } from './generated/Properties.stubs.js';
+import { PropertiesServiceStubs } from './generated/PropertiesService.stubs.js';
 
 function propertiesPath(srcDir: string): string {
   return join(srcDir, 'gas-p.properties.json');
@@ -45,6 +46,7 @@ function writeAll(srcDir: string, all: Record<string, string>): void {
 
 export function createPropertiesService(srcDir: string) {
   const scriptProperties = {
+    ...PropertiesStubs,
     getProperty(key: string): string | null {
       const all = readAll(srcDir);
       return all[key] ?? null;
@@ -65,14 +67,9 @@ export function createPropertiesService(srcDir: string) {
   };
 
   return {
+    ...PropertiesServiceStubs,
     getScriptProperties() {
       return scriptProperties;
-    },
-    getUserProperties(): never {
-      throw new GasPNotImplementedError('PropertiesService', 'getUserProperties');
-    },
-    getDocumentProperties(): never {
-      throw new GasPNotImplementedError('PropertiesService', 'getDocumentProperties');
     },
   };
 }

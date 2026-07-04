@@ -9,7 +9,7 @@ import { Utilities } from '../shims/Utilities.js';
 import { CacheService } from '../shims/CacheService.js';
 import { createSession } from '../shims/Session.js';
 import { createPropertiesService } from '../shims/PropertiesService.js';
-import { buildHtmlService, isHtmlOutput, type HtmlOutput } from '../shims/HtmlService.js';
+import { createHtmlService, isHtmlOutput, type HtmlOutput } from '../shims/HtmlService.js';
 import { UrlFetchApp } from '../shims/UrlFetchApp.js';
 import { Logger } from '../shims/Logger.js';
 
@@ -27,7 +27,7 @@ export interface ConsumerViteConfig {
 function createSandbox(srcDir: string, services?: ServiceOptions, htmlDir?: string): vm.Context {
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
-  sandbox.HtmlService = buildHtmlService(htmlDir ?? srcDir, sandbox);
+  sandbox.HtmlService = createHtmlService(htmlDir ?? srcDir, sandbox);
   sandbox.Utilities = Utilities;
   sandbox.CacheService = CacheService;
   sandbox.PropertiesService = createPropertiesService(srcDir);

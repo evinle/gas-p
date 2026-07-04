@@ -83,4 +83,39 @@ describe('findImplementedMethods scoped to a container name', () => {
 
     expect(findImplementedMethods(source, 'scriptCache')).toEqual(new Set(['get']));
   });
+
+  it('scopes to a create<Scope> factory that returns via a named local variable rather than an inline literal', () => {
+    const source = `
+      function createHtmlOutput(content: string) {
+        const output = {
+          getContent() {
+            return content;
+          },
+          append(): never {
+            throw new GasPNotImplementedError('HtmlOutput', 'append');
+          },
+        };
+        return output;
+      }
+    `;
+
+    expect(findImplementedMethods(source, 'HtmlOutput')).toEqual(new Set(['getContent']));
+  });
+
+  it('recognizes a property assignment with an arrow function value as a real implementation', () => {
+    const source = `
+      function createHtmlOutput(content: string) {
+        const output = {
+          getContent: () => content,
+          getTitle: () => undefined,
+          append(): never {
+            throw new GasPNotImplementedError('HtmlOutput', 'append');
+          },
+        };
+        return output;
+      }
+    `;
+
+    expect(findImplementedMethods(source, 'HtmlOutput')).toEqual(new Set(['getContent', 'getTitle']));
+  });
 });

@@ -42,4 +42,53 @@ export const stubTargets: StubTarget[] = [
     outputName: 'CalendarEvent',
     existingShimFile: join(SRC_ROOT, 'shims/CalendarApp.ts'),
   },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.utilities.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Utilities.Utilities',
+    outputName: 'Utilities',
+    existingShimFile: join(SRC_ROOT, 'shims/Utilities.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.properties.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Properties.PropertiesService',
+    outputName: 'PropertiesService',
+    existingShimFile: join(SRC_ROOT, 'shims/PropertiesService.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.properties.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Properties.Properties',
+    outputName: 'Properties',
+    existingShimFile: join(SRC_ROOT, 'shims/PropertiesService.ts'),
+    implementationScope: 'scriptProperties',
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.base.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Base.Session',
+    outputName: 'Session',
+    existingShimFile: join(SRC_ROOT, 'shims/Session.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.base.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Base.User',
+    outputName: 'User',
+    existingShimFile: join(SRC_ROOT, 'shims/Session.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.html.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.HTML.HtmlService',
+    outputName: 'HtmlService',
+    existingShimFile: join(SRC_ROOT, 'shims/HtmlService.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.html.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.HTML.HtmlOutput',
+    outputName: 'HtmlOutput',
+    existingShimFile: join(SRC_ROOT, 'shims/HtmlService.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.html.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.HTML.HtmlTemplate',
+    outputName: 'HtmlTemplate',
+    existingShimFile: join(SRC_ROOT, 'shims/HtmlService.ts'),
+  },
 ];
