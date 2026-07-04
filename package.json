@@ -31,7 +31,9 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "generate:stubs": "tsx src/generator/generate.ts",
+    "generate:stubs:check": "tsx src/generator/generate.ts --check"
   },
   "dependencies": {
     "commander": "^13.1.0",
@@ -45,6 +47,7 @@
     "vite": "^7.3.6"
   },
   "devDependencies": {
+    "@types/google-apps-script": "^2.0.11",
     "@types/node": "^22.15.29",
     "typescript": "^5.8.3",
     "vite": "^7.3.6",

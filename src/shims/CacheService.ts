@@ -1,4 +1,5 @@
-import { GasPNotImplementedError } from '../errors.js';
+import { CacheStubs } from './generated/Cache.stubs.js';
+import { CacheServiceStubs } from './generated/CacheService.stubs.js';
 
 const DEFAULT_EXPIRATION_SECONDS = 600;
 
@@ -27,28 +28,11 @@ function remove(key: string): void {
   store.delete(key);
 }
 
-function getAll(_keys: string[]): never {
-  throw new GasPNotImplementedError('Cache', 'getAll');
-}
-
-function putAll(_values: Record<string, string>): never {
-  throw new GasPNotImplementedError('Cache', 'putAll');
-}
-
-function removeAll(_keys: string[]): never {
-  throw new GasPNotImplementedError('Cache', 'removeAll');
-}
-
-const scriptCache = { get, put, remove, getAll, putAll, removeAll };
+const scriptCache = { ...CacheStubs, get, put, remove };
 
 export const CacheService = {
+  ...CacheServiceStubs,
   getScriptCache() {
     return scriptCache;
-  },
-  getUserCache(): never {
-    throw new GasPNotImplementedError('CacheService', 'getUserCache');
-  },
-  getDocumentCache(): never {
-    throw new GasPNotImplementedError('CacheService', 'getDocumentCache');
   },
 };
