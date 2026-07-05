@@ -78,6 +78,7 @@ interface SandboxBuildParams {
   htmlDir?: string;
   sandbox: vm.Context;
   services?: ServiceOptions;
+  userAgent?: string;
 }
 
 interface ConfiguredService {
@@ -93,7 +94,7 @@ const CONFIGURED_SERVICES: ConfiguredService[] = [
   {
     name: 'HtmlService',
     requiresServices: false,
-    create: ({ srcDir, htmlDir, sandbox }) => new HtmlService(htmlDir ?? srcDir, sandbox),
+    create: ({ srcDir, htmlDir, sandbox, userAgent }) => new HtmlService(htmlDir ?? srcDir, sandbox, userAgent),
   },
   {
     name: 'PropertiesService',
@@ -129,15 +130,37 @@ export interface ConsumerViteConfig {
   plugins?: InlineConfig['plugins'];
 }
 
-function createSandbox(srcDir: string, services?: ServiceOptions, htmlDir?: string): vm.Context {
+// The static, resolved-once-at-startup inputs shared by buildContext and
+// buildBundledContext. userAgent is deliberately not part of this — it's a
+// genuine per-request runtime value (the calling browser's User-Agent
+// header), not startup config, so buildContext/buildBundledContext take it
+// as a separate argument instead.
+export interface BuildContextConfig {
+  srcDir: string;
+  services?: ServiceOptions;
+  htmlDir?: string;
+}
+
+export interface BuildBundledContextConfig extends BuildContextConfig {
+  entry: string;
+  consumerConfig?: ConsumerViteConfig;
+}
+
+function createSandbox(config: BuildContextConfig, userAgent?: string): vm.Context {
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
 
   Object.assign(sandbox, STATIC_SERVICES);
 
-  const params: SandboxBuildParams = { srcDir, htmlDir, sandbox, services };
+  const params: SandboxBuildParams = {
+    srcDir: config.srcDir,
+    htmlDir: config.htmlDir,
+    sandbox,
+    services: config.services,
+    userAgent,
+  };
   for (const configured of CONFIGURED_SERVICES) {
-    if (configured.requiresServices && !services) continue;
+    if (configured.requiresServices && !config.services) continue;
     sandbox[configured.name] = configured.create(params);
   }
 
@@ -146,9 +169,10 @@ function createSandbox(srcDir: string, services?: ServiceOptions, htmlDir?: stri
 
 // Builds a fresh vm context per call, matching Apps Script's per-execution
 // model: no module-level state persists across separate buildContext calls.
-export function buildContext(srcDir: string, services?: ServiceOptions, htmlDir?: string): vm.Context {
-  const sandbox = createSandbox(srcDir, services, htmlDir);
+export function buildContext(config: BuildContextConfig, userAgent?: string): vm.Context {
+  const sandbox = createSandbox(config, userAgent);
 
+  const { srcDir } = config;
   const sourceFiles = readdirSync(srcDir).filter((f) => extname(f) === '.gs' || extname(f) === '.js');
   if (sourceFiles.length === 0) {
     throw new Error(`No .gs/.js source found in ${srcDir} — for a .ts project, use buildBundledContext(srcDir, entry) instead.`);
@@ -169,16 +193,11 @@ export function buildContext(srcDir: string, services?: ServiceOptions, htmlDir?
 // already-resolved vite.config.ts (e.g. via server.config in configureServer),
 // so this dev-time bundle resolves aliases/imports identically to their real
 // `vite build` / `clasp push` artifact instead of a bare, config-less bundle.
-export async function buildBundledContext(
-  srcDir: string,
-  entry: string,
-  consumerConfig?: ConsumerViteConfig,
-  services?: ServiceOptions,
-  htmlDir?: string
-): Promise<vm.Context> {
-  const sandbox = createSandbox(srcDir, services, htmlDir);
+export async function buildBundledContext(config: BuildBundledContextConfig, userAgent?: string): Promise<vm.Context> {
+  const sandbox = createSandbox(config, userAgent);
   sandbox.module = { exports: {} };
 
+  const { srcDir, entry, consumerConfig } = config;
   const result = await build({
     root: srcDir,
     configFile: false,

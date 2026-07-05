@@ -6,10 +6,11 @@ import { gasPVitePlugin } from '../adapters/vitePlugin.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, '__fixtures__', 'dispatch');
 
-function fakeRequest(method: string, body: unknown, url = '/') {
+function fakeRequest(method: string, body: unknown, opts: { url?: string; headers?: Record<string, string> } = {}) {
   return {
     method,
-    url,
+    url: opts.url ?? '/',
+    headers: opts.headers ?? {},
     async *[Symbol.asyncIterator]() {
       yield Buffer.from(JSON.stringify(body));
     },
@@ -157,7 +158,7 @@ describe('gasPVitePlugin', () => {
     expect(pageHandlerCall).toBeDefined();
     const [pageHandler] = pageHandlerCall!;
 
-    const req = fakeRequest('GET', undefined, '/');
+    const req = fakeRequest('GET', undefined, { url: '/' });
     const res = fakeResponse();
     const next = vi.fn();
     await pageHandler(req, res, next);
@@ -181,7 +182,7 @@ describe('gasPVitePlugin', () => {
     const pageHandlerCall = use.mock.calls.find((call) => call.length === 1);
     const [pageHandler] = pageHandlerCall!;
 
-    const req = fakeRequest('GET', undefined, '/');
+    const req = fakeRequest('GET', undefined, { url: '/' });
     const res = fakeResponse();
     await pageHandler(req, res, vi.fn());
 
@@ -222,5 +223,18 @@ describe('gasPVitePlugin', () => {
     const res = fakeResponse();
     await handler(req, res, vi.fn());
     expect(JSON.parse(res.body)).toEqual({ ok: true, value: 'org-789' });
+  });
+
+  it("threads the real request's User-Agent header through to HtmlService.getUserAgent()", async () => {
+    const fixture = join(FIXTURES, 'user-agent');
+    const plugin = gasPVitePlugin({ srcDir: fixture, endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    plugin.configureServer(fakeServer(use));
+    const [, handler] = use.mock.calls.find((call) => call.length === 2)!;
+
+    const req = fakeRequest('POST', { fnName: 'whoAmI', args: [] }, { headers: { 'user-agent': 'ExampleBrowser/1.0' } });
+    const res = fakeResponse();
+    await handler(req, res, vi.fn());
+    expect(JSON.parse(res.body)).toEqual({ ok: true, value: 'ExampleBrowser/1.0' });
   });
 });

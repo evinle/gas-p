@@ -207,11 +207,23 @@ export class HtmlService extends HtmlServiceStubs {
   readonly SandboxMode = { EMULATED: 'EMULATED', IFRAME: 'IFRAME', NATIVE: 'NATIVE' };
   readonly XFrameOptionsMode = { ALLOWALL: 'ALLOWALL', DEFAULT: 'DEFAULT' };
 
+  // Three self-evident, differently-typed params (path, vm sandbox, optional
+  // UA string) at a single internal call site (context.ts) — kept positional
+  // rather than grouped per the object-grouping guideline in CONTRIBUTING.md,
+  // since there's no real ordering-mixup risk here.
   constructor(
     private srcDir: string,
-    private context: vm.Context
+    private context: vm.Context,
+    private userAgent?: string
   ) {
     super();
+  }
+
+  // "Gets the user-agent string for the current browser." — HtmlService
+  // docs. Only meaningful for a real doGet() request; undefined for an RPC
+  // (google.script.run) call with no browser context to report.
+  getUserAgent(): string | undefined {
+    return this.userAgent;
   }
 
   createTemplateFromFile(filename: string) {

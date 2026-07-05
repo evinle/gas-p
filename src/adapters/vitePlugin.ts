@@ -9,6 +9,7 @@ import { DEFAULT_CREDENTIALS_PATH, DEFAULT_CLIENT_SECRET_PATH } from '../auth.js
 interface RpcRequest {
   method?: string;
   url?: string;
+  headers?: Record<string, string | string[] | undefined>;
   [Symbol.asyncIterator](): AsyncIterableIterator<Buffer | string>;
 }
 
@@ -51,6 +52,11 @@ function isRpcRequestBody(x: unknown): x is { fnName: string; args: unknown[] } 
   if (!('fnName' in x) || typeof x.fnName !== 'string') return false;
   if (!('args' in x) || !Array.isArray(x.args)) return false;
   return true;
+}
+
+function extractUserAgent(req: RpcRequest): string | undefined {
+  const userAgent = req.headers?.['user-agent'];
+  return typeof userAgent === 'string' ? userAgent : undefined;
 }
 
 async function readBody(req: RpcRequest): Promise<string> {
@@ -105,7 +111,7 @@ export function gasPVitePlugin(options: GasPPluginOptions): Plugin {
         resolve: server.config.resolve,
         plugins: (server.config.plugins ?? []).filter(isConsumerPlugin) as ConsumerViteConfig['plugins'],
       };
-      const source = resolveSource(srcDir, entry, consumerConfig, services, options.htmlDir);
+      const source = resolveSource({ srcDir, entry, consumerConfig, services, htmlDir: options.htmlDir });
 
       // No path filter and no returned callback: this runs on every request,
       // ahead of Vite's own HTML middleware, so a raw <?= ?> scriptlet
@@ -116,7 +122,7 @@ export function gasPVitePlugin(options: GasPPluginOptions): Plugin {
           return;
         }
 
-        const html = await source.renderDoGet();
+        const html = await source.renderDoGet(extractUserAgent(req));
         const transformed = await server.transformIndexHtml(req.url, html);
 
         res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -139,7 +145,7 @@ export function gasPVitePlugin(options: GasPPluginOptions): Plugin {
 
         // Fresh context per request, matching Apps Script's per-execution
         // model: no module-level state persists across calls.
-        const context = await source.buildContext();
+        const context = await source.buildContext(extractUserAgent(req));
         const result = handleRpcCall(context, parsed.fnName, parsed.args);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -9,29 +9,29 @@ const CONTEXT_FIXTURES = join(__dirname, '__fixtures__', 'context');
 
 describe('renderDoGet', () => {
   it('renders the HTML file returned by doGet unchanged when it has no scriptlets', () => {
-    const html = renderDoGet(join(FIXTURES, 'plain-html'));
+    const html = renderDoGet({ srcDir: join(FIXTURES, 'plain-html') });
     expect(html).toBe(
       ['<html>', '  <body>', '    <h1>Hello gas-p</h1>', '  </body>', '</html>', ''].join('\n')
     );
   });
 
   it('HTML-escapes <?= ?> scriptlet output', () => {
-    const html = renderDoGet(join(FIXTURES, 'escaped-scriptlet'));
+    const html = renderDoGet({ srcDir: join(FIXTURES, 'escaped-scriptlet') });
     expect(html).toBe('<p>Hello, &lt;b&gt;World&lt;/b&gt;!</p>\n');
   });
 
   it('does not escape <?!= ?> scriptlet output', () => {
-    const html = renderDoGet(join(FIXTURES, 'unescaped-scriptlet'));
+    const html = renderDoGet({ srcDir: join(FIXTURES, 'unescaped-scriptlet') });
     expect(html).toBe('<p>Hello, <b>World</b>!</p>\n');
   });
 
   it('strips <?# ?> scriptlet comments entirely from the output', () => {
-    const html = renderDoGet(join(FIXTURES, 'comment-scriptlet'));
+    const html = renderDoGet({ srcDir: join(FIXTURES, 'comment-scriptlet') });
     expect(html).toBe('<p>Hello, World!</p>\n');
   });
 
   it('renders a plain HtmlOutput from createHtmlOutputFromFile().setTitle(), matching the real v-reimburse doGet() pattern', () => {
-    const html = renderDoGet(join(FIXTURES, 'html-output'));
+    const html = renderDoGet({ srcDir: join(FIXTURES, 'html-output') });
     expect(html).toBe(
       ['<html>', '  <body>', '    <h1>VReimbursement Portal</h1>', '  </body>', '</html>', ''].join('\n')
     );
@@ -39,14 +39,14 @@ describe('renderDoGet', () => {
 
   it('does not persist module-level state across separate renderDoGet calls', () => {
     const counterDir = join(FIXTURES, 'counter');
-    const first = renderDoGet(counterDir);
-    const second = renderDoGet(counterDir);
+    const first = renderDoGet({ srcDir: counterDir });
+    const second = renderDoGet({ srcDir: counterDir });
     expect(first).toBe('<p>Count: 1</p>\n');
     expect(second).toBe('<p>Count: 1</p>\n');
   });
 
   it('handles escaped, unescaped, and comment scriptlets together in one template', () => {
-    const html = renderDoGet(join(FIXTURES, 'combined-scriptlets'));
+    const html = renderDoGet({ srcDir: join(FIXTURES, 'combined-scriptlets') });
     expect(html).toBe(
       [
         '<h1>Welcome to gas-p &amp; friends</h1>',
@@ -59,29 +59,29 @@ describe('renderDoGet', () => {
   });
 
   it('throws a ReferenceError when doGet references an undeclared global, matching real Apps Script', () => {
-    expect(() => renderDoGet(join(FIXTURES, 'undeclared-global'))).toThrow(ReferenceError);
-    expect(() => renderDoGet(join(FIXTURES, 'undeclared-global'))).toThrow(/someUndeclaredService is not defined/);
+    expect(() => renderDoGet({ srcDir: join(FIXTURES, 'undeclared-global') })).toThrow(ReferenceError);
+    expect(() => renderDoGet({ srcDir: join(FIXTURES, 'undeclared-global') })).toThrow(/someUndeclaredService is not defined/);
   });
 });
 
 describe('renderDoGetBundled', () => {
   it('throws a host-realm ReferenceError when doGet references an undeclared global in bundled .ts source', async () => {
     const dir = join(CONTEXT_FIXTURES, 'undeclared-global');
-    await expect(renderDoGetBundled(dir, 'Code.ts')).rejects.toThrow(ReferenceError);
-    await expect(renderDoGetBundled(dir, 'Code.ts')).rejects.toThrow(/someUndeclaredService is not defined/);
+    await expect(renderDoGetBundled({ srcDir: dir, entry: 'Code.ts' })).rejects.toThrow(ReferenceError);
+    await expect(renderDoGetBundled({ srcDir: dir, entry: 'Code.ts' })).rejects.toThrow(/someUndeclaredService is not defined/);
   });
 
   it('reads HtmlOutput files from htmlDir instead of srcDir when htmlDir is given', async () => {
     const dir = join(CONTEXT_FIXTURES, 'html-dir-override', 'entry-ts');
     const htmlDir = join(CONTEXT_FIXTURES, 'html-dir-override', 'views');
-    const html = await renderDoGetBundled(dir, 'Code.ts', undefined, undefined, htmlDir);
+    const html = await renderDoGetBundled({ srcDir: dir, entry: 'Code.ts', htmlDir });
     expect(html).toBe('<p>from the views dir, not the entry dir</p>\n');
   });
 });
 
 describe('resolveSource', () => {
   it('uses the raw .gs/.js path when entry is undefined', async () => {
-    const source = resolveSource(join(FIXTURES, 'plain-html'), undefined);
+    const source = resolveSource({ srcDir: join(FIXTURES, 'plain-html') });
     const html = await source.renderDoGet();
     expect(html).toBe(
       ['<html>', '  <body>', '    <h1>Hello gas-p</h1>', '  </body>', '</html>', ''].join('\n')
@@ -89,7 +89,7 @@ describe('resolveSource', () => {
   });
 
   it('uses the bundled .ts path when entry is given', async () => {
-    const source = resolveSource(join(CONTEXT_FIXTURES, 'multi-file-import'), 'Code.ts');
+    const source = resolveSource({ srcDir: join(CONTEXT_FIXTURES, 'multi-file-import'), entry: 'Code.ts' });
     const context = await source.buildContext();
     expect(context.getGreeting('World')).toBe('Hello, World');
   });
@@ -97,8 +97,14 @@ describe('resolveSource', () => {
   it('threads htmlDir through to the bundled .ts path', async () => {
     const dir = join(CONTEXT_FIXTURES, 'html-dir-override', 'entry-ts');
     const htmlDir = join(CONTEXT_FIXTURES, 'html-dir-override', 'views');
-    const source = resolveSource(dir, 'Code.ts', undefined, undefined, htmlDir);
+    const source = resolveSource({ srcDir: dir, entry: 'Code.ts', htmlDir });
     const html = await source.renderDoGet();
     expect(html).toBe('<p>from the views dir, not the entry dir</p>\n');
+  });
+
+  it('threads a per-call user agent through to HtmlService.getUserAgent()', async () => {
+    const source = resolveSource({ srcDir: join(FIXTURES, 'plain-html') });
+    const context = await source.buildContext('ExampleBrowser/1.0');
+    expect(context.HtmlService.getUserAgent()).toBe('ExampleBrowser/1.0');
   });
 });
