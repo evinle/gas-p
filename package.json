@@ -17,7 +17,8 @@
   },
   "exports": {
     "./vite": "./dist/adapters/vitePlugin.js",
-    "./client": "./dist/client/transportShim.js"
+    "./client": "./dist/client/transportShim.js",
+    "./fixtures": "./dist/core/fixtures.js"
   },
   "bin": {
     "gas-p": "./dist/cli.js"

@@ -56,12 +56,38 @@ interface EligibleServiceInstances {
   LinearOptimizationService: typeof LinearOptimizationService;
 }
 
-// Every stub method today is typed (...args: unknown[]) => never (see the
-// generated *.stubs.ts classes), so a real method's return type can't be
-// usefully required of a fixture's value — we only get real mileage out of
-// checking the method *name* and its argument list, and relax the fixture's
-// own value/return type to unknown.
-type MethodFixtureValue<M> = M extends (...args: infer A) => unknown ? unknown | ((...args: A) => unknown) : never;
+// True only for T = never — boxed in a tuple so the check doesn't hit
+// conditional types' own never-short-circuit rule (a naked `T extends X`
+// resolves straight to `never` when T is instantiated with never, before X
+// is ever consulted, which is exactly the case DeepPartialFixture needs to
+// detect rather than skip).
+type IsNever<T> = [T] extends [never] ? true : false;
+
+// A fixture only needs to answer the calls a consumer actually declares, not
+// implement a real Calendar/CalendarEvent/etc. interface in full — so every
+// method a real return type declares is made optional, recursively, instead
+// of requiring the whole shape. Methods still get real, non-`any` parameter
+// types from the actual GAS interface (autocomplete included); only their
+// declared-but-unimplemented depth is what's optional. Stub-only methods
+// (generated *.stubs.ts classes type every method as
+// `(...args: unknown[]) => never`) have no usable return type to recurse
+// into, so they fall back to `unknown`, same as a fixture's own top-level
+// value (see MethodFixtureValue below).
+type DeepPartialFixture<T> = IsNever<T> extends true
+  ? unknown
+  : T extends (...args: infer A) => infer R
+    ? (...args: A) => DeepPartialFixture<R>
+    : T extends Date
+      ? T
+      : T extends readonly (infer U)[]
+        ? DeepPartialFixture<U>[]
+        : T extends object
+          ? { [K in keyof T]?: DeepPartialFixture<T[K]> }
+          : T;
+
+type MethodFixtureValue<M> = M extends (...args: infer A) => infer R
+  ? DeepPartialFixture<R> | ((...args: A) => DeepPartialFixture<R>)
+  : never;
 
 type TypedServiceFixtures<T> = { [K in keyof T]?: MethodFixtureValue<T[K]> };
 
