@@ -5,16 +5,6 @@ import { HtmlServiceStubs } from './generated/HtmlService.stubs.js';
 import { HtmlOutputStubs } from './generated/HtmlOutput.stubs.js';
 import { HtmlTemplateStubs } from './generated/HtmlTemplate.stubs.js';
 
-export interface HtmlOutput {
-  getContent(): string;
-  getTitle?(): string | undefined;
-  setTitle?(title: string): HtmlOutput;
-  append?(addedContent: string): HtmlOutput;
-  addMetaTag?(name: string, content: string): HtmlOutput;
-  setFaviconUrl?(iconUrl: string): HtmlOutput;
-  setXFrameOptionsMode?(mode: string): HtmlOutput;
-}
-
 export function isHtmlOutput(x: unknown): x is HtmlOutput {
   if (typeof x !== 'object' || x === null) return false;
   if (!('getContent' in x)) return false;
@@ -38,45 +28,62 @@ function evaluateTemplate(raw: string, context: vm.Context): string {
   });
 }
 
-function createHtmlOutput(content: string): HtmlOutput {
-  let title: string | undefined;
-  const output: HtmlOutput = {
-    ...HtmlOutputStubs,
-    getContent: () => content,
-    getTitle: () => title,
-    setTitle(newTitle: string): HtmlOutput {
-      title = newTitle;
-      return output;
-    },
-  };
-  return output;
+export class HtmlOutput extends HtmlOutputStubs {
+  private title: string | undefined;
+
+  constructor(private content: string) {
+    super();
+  }
+
+  getContent(): string {
+    return this.content;
+  }
+
+  getTitle(): string | undefined {
+    return this.title;
+  }
+
+  setTitle(newTitle: string): HtmlOutput {
+    this.title = newTitle;
+    return this;
+  }
 }
 
-function createHtmlTemplate(raw: string, context: vm.Context) {
-  return {
-    ...HtmlTemplateStubs,
-    evaluate(): HtmlOutput {
-      return { getContent: () => evaluateTemplate(raw, context) };
-    },
-  };
+class HtmlTemplate extends HtmlTemplateStubs {
+  constructor(
+    private raw: string,
+    private context: vm.Context
+  ) {
+    super();
+  }
+
+  evaluate(): HtmlOutput {
+    return new HtmlOutput(evaluateTemplate(this.raw, this.context));
+  }
 }
 
 // createTemplateFromFile's evaluate() needs a live reference to the sandbox's
 // own vm.Context to run <?= ?> scriptlet expressions against the script's own
 // globals — unlike the rest of this shim, it can't be decoupled from the vm.
-export function createHtmlService(srcDir: string, context: vm.Context) {
-  return {
-    ...HtmlServiceStubs,
-    createTemplateFromFile(filename: string) {
-      const raw = readFileSync(join(srcDir, `${filename}.html`), 'utf-8');
-      return createHtmlTemplate(raw, context);
-    },
-    createHtmlOutputFromFile(filename: string): HtmlOutput {
-      const content = readFileSync(join(srcDir, `${filename}.html`), 'utf-8');
-      return createHtmlOutput(content);
-    },
-    createHtmlOutput(html = ''): HtmlOutput {
-      return createHtmlOutput(html);
-    },
-  };
+export class HtmlService extends HtmlServiceStubs {
+  constructor(
+    private srcDir: string,
+    private context: vm.Context
+  ) {
+    super();
+  }
+
+  createTemplateFromFile(filename: string) {
+    const raw = readFileSync(join(this.srcDir, `${filename}.html`), 'utf-8');
+    return new HtmlTemplate(raw, this.context);
+  }
+
+  createHtmlOutputFromFile(filename: string): HtmlOutput {
+    const content = readFileSync(join(this.srcDir, `${filename}.html`), 'utf-8');
+    return new HtmlOutput(content);
+  }
+
+  createHtmlOutput(html = ''): HtmlOutput {
+    return new HtmlOutput(html);
+  }
 }

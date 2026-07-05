@@ -22,22 +22,22 @@ afterEach(() => {
 
 describe('PropertiesService.getScriptProperties().getProperty()', () => {
   it('reads a value from gas-p.properties.json', async () => {
-    const { createPropertiesService } = await import('../shims/PropertiesService.js');
-    const props = createPropertiesService(scratchDir);
+    const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+    const props = new PropertiesServiceClass(scratchDir);
     expect(props.getScriptProperties().getProperty('API_KEY')).toBe('secret123');
   });
 
   it('returns null for a key that is not in gas-p.properties.json', async () => {
-    const { createPropertiesService } = await import('../shims/PropertiesService.js');
-    const props = createPropertiesService(scratchDir);
+    const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+    const props = new PropertiesServiceClass(scratchDir);
     expect(props.getScriptProperties().getProperty('NOT_THERE')).toBeNull();
   });
 });
 
 describe('PropertiesService.getScriptProperties().setProperty()', () => {
   it('writes the new value to gas-p.properties.json immediately', async () => {
-    const { createPropertiesService } = await import('../shims/PropertiesService.js');
-    const props = createPropertiesService(scratchDir);
+    const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+    const props = new PropertiesServiceClass(scratchDir);
     props.getScriptProperties().setProperty('NEW_KEY', 'new-value');
 
     const onDisk = JSON.parse(readFileSync(join(scratchDir, 'gas-p.properties.json'), 'utf-8'));
@@ -46,8 +46,8 @@ describe('PropertiesService.getScriptProperties().setProperty()', () => {
   });
 
   it('does not clobber existing keys when writing a new one', async () => {
-    const { createPropertiesService } = await import('../shims/PropertiesService.js');
-    const props = createPropertiesService(scratchDir);
+    const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+    const props = new PropertiesServiceClass(scratchDir);
     props.getScriptProperties().setProperty('NEW_KEY', 'new-value');
     expect(props.getScriptProperties().getProperty('API_KEY')).toBe('secret123');
   });
@@ -55,8 +55,8 @@ describe('PropertiesService.getScriptProperties().setProperty()', () => {
 
 describe('PropertiesService.getScriptProperties().deleteProperty()', () => {
   it('removes the key from gas-p.properties.json immediately', async () => {
-    const { createPropertiesService } = await import('../shims/PropertiesService.js');
-    const props = createPropertiesService(scratchDir);
+    const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+    const props = new PropertiesServiceClass(scratchDir);
     props.getScriptProperties().deleteProperty('API_KEY');
 
     expect(props.getScriptProperties().getProperty('API_KEY')).toBeNull();
@@ -67,8 +67,8 @@ describe('PropertiesService.getScriptProperties().deleteProperty()', () => {
 
 describe('PropertiesService.getScriptProperties().getProperties()', () => {
   it('returns all key-value pairs', async () => {
-    const { createPropertiesService } = await import('../shims/PropertiesService.js');
-    const props = createPropertiesService(scratchDir);
+    const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+    const props = new PropertiesServiceClass(scratchDir);
     expect(props.getScriptProperties().getProperties()).toEqual({
       API_KEY: 'secret123',
       ORG_ID: 'org-456',
@@ -81,8 +81,8 @@ describe('PropertiesService missing gas-p.properties.json', () => {
     const emptyDir = mkdtempSync(join(tmpdir(), 'gas-p-properties-empty-'));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const { createPropertiesService } = await import('../shims/PropertiesService.js');
-      const props = createPropertiesService(emptyDir);
+      const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+      const props = new PropertiesServiceClass(emptyDir);
       expect(props.getScriptProperties().getProperty('ANYTHING')).toBeNull();
       expect(existsSync(join(emptyDir, 'gas-p.properties.json'))).toBe(true);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('gas-p.properties.json'));
@@ -97,8 +97,8 @@ describe('PropertiesService .gitignore check', () => {
   it('warns once if gas-p.properties.json is not covered by the project .gitignore', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const { createPropertiesService } = await import('../shims/PropertiesService.js');
-      const props = createPropertiesService(scratchDir);
+      const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+      const props = new PropertiesServiceClass(scratchDir);
       props.getScriptProperties().getProperty('API_KEY');
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('.gitignore'));
 
@@ -114,8 +114,8 @@ describe('PropertiesService .gitignore check', () => {
     writeFileSync(join(scratchDir, '.gitignore'), 'gas-p.properties.json\n');
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const { createPropertiesService } = await import('../shims/PropertiesService.js');
-      const props = createPropertiesService(scratchDir);
+      const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+      const props = new PropertiesServiceClass(scratchDir);
       props.getScriptProperties().getProperty('API_KEY');
       expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('.gitignore'));
     } finally {
@@ -126,14 +126,14 @@ describe('PropertiesService .gitignore check', () => {
 
 describe('PropertiesService unimplemented methods', () => {
   it('getUserProperties throws GasPNotImplementedError', async () => {
-    const { createPropertiesService } = await import('../shims/PropertiesService.js');
-    const props = createPropertiesService(scratchDir);
+    const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+    const props = new PropertiesServiceClass(scratchDir);
     expect(() => props.getUserProperties()).toThrow(GasPNotImplementedError);
   });
 
   it('getDocumentProperties throws GasPNotImplementedError', async () => {
-    const { createPropertiesService } = await import('../shims/PropertiesService.js');
-    const props = createPropertiesService(scratchDir);
+    const { PropertiesService: PropertiesServiceClass } = await import('../shims/PropertiesService.js');
+    const props = new PropertiesServiceClass(scratchDir);
     expect(() => props.getDocumentProperties()).toThrow(GasPNotImplementedError);
   });
 });

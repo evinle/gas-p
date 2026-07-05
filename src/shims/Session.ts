@@ -52,23 +52,30 @@ function fetchActiveUserEmail(credentialsPath: string, clientSecretPath: string)
   return raw.email;
 }
 
-function createUser(email: string) {
-  return {
-    ...UserStubs,
-    getEmail(): string {
-      return email;
-    },
-  };
+class User extends UserStubs {
+  constructor(private email: string) {
+    super();
+  }
+
+  getEmail(): string {
+    return this.email;
+  }
 }
 
-export function createSession(credentialsPath: string, clientSecretPath: string, srcDir: string) {
-  return {
-    ...SessionStubs,
-    getScriptTimeZone(): string {
-      return readTimeZone(srcDir);
-    },
-    getActiveUser() {
-      return createUser(fetchActiveUserEmail(credentialsPath, clientSecretPath));
-    },
-  };
+export class Session extends SessionStubs {
+  constructor(
+    private credentialsPath: string,
+    private clientSecretPath: string,
+    private srcDir: string
+  ) {
+    super();
+  }
+
+  getScriptTimeZone(): string {
+    return readTimeZone(this.srcDir);
+  }
+
+  getActiveUser() {
+    return new User(fetchActiveUserEmail(this.credentialsPath, this.clientSecretPath));
+  }
 }

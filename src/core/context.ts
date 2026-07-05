@@ -7,9 +7,9 @@ import type { OutputChunk, RollupOutput } from 'rollup';
 import { CalendarApp } from '../shims/CalendarApp.js';
 import { Utilities } from '../shims/Utilities.js';
 import { CacheService } from '../shims/CacheService.js';
-import { createSession } from '../shims/Session.js';
-import { createPropertiesService } from '../shims/PropertiesService.js';
-import { createHtmlService, isHtmlOutput, type HtmlOutput } from '../shims/HtmlService.js';
+import { Session } from '../shims/Session.js';
+import { PropertiesService } from '../shims/PropertiesService.js';
+import { HtmlService, isHtmlOutput, type HtmlOutput } from '../shims/HtmlService.js';
 import { UrlFetchApp } from '../shims/UrlFetchApp.js';
 import { Logger } from '../shims/Logger.js';
 
@@ -27,15 +27,15 @@ export interface ConsumerViteConfig {
 function createSandbox(srcDir: string, services?: ServiceOptions, htmlDir?: string): vm.Context {
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
-  sandbox.HtmlService = createHtmlService(htmlDir ?? srcDir, sandbox);
+  sandbox.HtmlService = new HtmlService(htmlDir ?? srcDir, sandbox);
   sandbox.Utilities = Utilities;
   sandbox.CacheService = CacheService;
-  sandbox.PropertiesService = createPropertiesService(srcDir);
+  sandbox.PropertiesService = new PropertiesService(srcDir);
   sandbox.UrlFetchApp = UrlFetchApp;
   sandbox.Logger = Logger;
   if (services) {
     sandbox.CalendarApp = new CalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
-    sandbox.Session = createSession(services.credentialsPath, services.clientSecretPath, srcDir);
+    sandbox.Session = new Session(services.credentialsPath, services.clientSecretPath, srcDir);
   }
   return sandbox;
 }

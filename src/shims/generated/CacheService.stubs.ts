@@ -1,10 +1,10 @@
 import { GasPNotImplementedError } from '../../errors.js';
 
-export const CacheServiceStubs = {
+export abstract class CacheServiceStubs {
   getDocumentCache(...args: unknown[]): never {
     throw new GasPNotImplementedError('CacheService', 'getDocumentCache');
-  },
+  }
   getUserCache(...args: unknown[]): never {
     throw new GasPNotImplementedError('CacheService', 'getUserCache');
-  },
-};
+  }
+}

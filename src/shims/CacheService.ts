@@ -8,31 +8,35 @@ interface CacheEntry {
   expiresAt: number;
 }
 
-const store = new Map<string, CacheEntry>();
+class Cache extends CacheStubs {
+  private store = new Map<string, CacheEntry>();
 
-function get(key: string): string | null {
-  const entry = store.get(key);
-  if (!entry) return null;
-  if (Date.now() >= entry.expiresAt) {
-    store.delete(key);
-    return null;
+  get(key: string): string | null {
+    const entry = this.store.get(key);
+    if (!entry) return null;
+    if (Date.now() >= entry.expiresAt) {
+      this.store.delete(key);
+      return null;
+    }
+    return entry.value;
   }
-  return entry.value;
+
+  put(key: string, value: string, expirationInSeconds: number = DEFAULT_EXPIRATION_SECONDS): void {
+    this.store.set(key, { value, expiresAt: Date.now() + expirationInSeconds * 1000 });
+  }
+
+  remove(key: string): void {
+    this.store.delete(key);
+  }
 }
 
-function put(key: string, value: string, expirationInSeconds: number = DEFAULT_EXPIRATION_SECONDS): void {
-  store.set(key, { value, expiresAt: Date.now() + expirationInSeconds * 1000 });
-}
+const scriptCache = new Cache();
 
-function remove(key: string): void {
-  store.delete(key);
-}
-
-const scriptCache = { ...CacheStubs, get, put, remove };
-
-export const CacheService = {
-  ...CacheServiceStubs,
+class CacheService extends CacheServiceStubs {
   getScriptCache() {
     return scriptCache;
-  },
-};
+  }
+}
+
+const instance = new CacheService();
+export { instance as CacheService };

@@ -44,32 +44,42 @@ function writeAll(srcDir: string, all: Record<string, string>): void {
   writeFileSync(propertiesPath(srcDir), JSON.stringify(all, null, 2));
 }
 
-export function createPropertiesService(srcDir: string) {
-  const scriptProperties = {
-    ...PropertiesStubs,
-    getProperty(key: string): string | null {
-      const all = readAll(srcDir);
-      return all[key] ?? null;
-    },
-    setProperty(key: string, value: string): void {
-      const all = readAll(srcDir);
-      all[key] = value;
-      writeAll(srcDir, all);
-    },
-    deleteProperty(key: string): void {
-      const all = readAll(srcDir);
-      delete all[key];
-      writeAll(srcDir, all);
-    },
-    getProperties(): Record<string, string> {
-      return readAll(srcDir);
-    },
-  };
+class Properties extends PropertiesStubs {
+  constructor(private srcDir: string) {
+    super();
+  }
 
-  return {
-    ...PropertiesServiceStubs,
-    getScriptProperties() {
-      return scriptProperties;
-    },
-  };
+  getProperty(key: string): string | null {
+    const all = readAll(this.srcDir);
+    return all[key] ?? null;
+  }
+
+  setProperty(key: string, value: string): void {
+    const all = readAll(this.srcDir);
+    all[key] = value;
+    writeAll(this.srcDir, all);
+  }
+
+  deleteProperty(key: string): void {
+    const all = readAll(this.srcDir);
+    delete all[key];
+    writeAll(this.srcDir, all);
+  }
+
+  getProperties(): Record<string, string> {
+    return readAll(this.srcDir);
+  }
+}
+
+export class PropertiesService extends PropertiesServiceStubs {
+  private scriptProperties: Properties;
+
+  constructor(private srcDir: string) {
+    super();
+    this.scriptProperties = new Properties(srcDir);
+  }
+
+  getScriptProperties() {
+    return this.scriptProperties;
+  }
 }
