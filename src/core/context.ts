@@ -12,6 +12,111 @@ import { PropertiesService } from '../shims/PropertiesService.js';
 import { HtmlService, isHtmlOutput, type HtmlOutput } from '../shims/HtmlService.js';
 import { UrlFetchApp } from '../shims/UrlFetchApp.js';
 import { Logger } from '../shims/Logger.js';
+import { FormApp } from '../shims/FormApp.js';
+import { SitesApp } from '../shims/SitesApp.js';
+import { GmailApp } from '../shims/GmailApp.js';
+import { GroupsApp } from '../shims/GroupsApp.js';
+import { Jdbc } from '../shims/Jdbc.js';
+import { LanguageApp } from '../shims/LanguageApp.js';
+import { LockService } from '../shims/LockService.js';
+import { DriveApp } from '../shims/DriveApp.js';
+import { ScriptApp } from '../shims/ScriptApp.js';
+import { ContactsApp } from '../shims/ContactsApp.js';
+import { MailApp } from '../shims/MailApp.js';
+import { ConferenceDataService } from '../shims/ConferenceDataService.js';
+import { XmlService } from '../shims/XmlService.js';
+import { DocumentApp } from '../shims/DocumentApp.js';
+import { Browser } from '../shims/Browser.js';
+import { DataStudioApp } from '../shims/DataStudioApp.js';
+import { SlidesApp } from '../shims/SlidesApp.js';
+import { CardService } from '../shims/CardService.js';
+import { SpreadsheetApp } from '../shims/SpreadsheetApp.js';
+import { ContentService } from '../shims/ContentService.js';
+import { Charts } from '../shims/Charts.js';
+import { Maps } from '../shims/Maps.js';
+import { LinearOptimizationService } from '../shims/LinearOptimizationService.js';
+
+// Already-instantiated singletons with no per-request construction — safe to
+// assign onto every sandbox unconditionally. Real implementations (Utilities,
+// CacheService, UrlFetchApp, Logger) and not-yet-implemented stub-only
+// services (everything else here) both fit this shape today; a stub-only
+// entry moves out of this object and into CONFIGURED_SERVICES below only if
+// its real implementation later needs config the shim module can't see on
+// its own (credentials, srcDir, ...).
+const STATIC_SERVICES: Record<string, unknown> = {
+  Utilities,
+  CacheService,
+  UrlFetchApp,
+  Logger,
+  FormApp,
+  SitesApp,
+  GmailApp,
+  GroupsApp,
+  Jdbc,
+  LanguageApp,
+  LockService,
+  DriveApp,
+  ScriptApp,
+  ContactsApp,
+  MailApp,
+  ConferenceDataService,
+  XmlService,
+  DocumentApp,
+  Browser,
+  DataStudioApp,
+  SlidesApp,
+  CardService,
+  SpreadsheetApp,
+  ContentService,
+  Charts,
+  Maps,
+  LinearOptimizationService,
+};
+
+interface SandboxBuildParams {
+  srcDir: string;
+  htmlDir?: string;
+  sandbox: vm.Context;
+  services?: ServiceOptions;
+}
+
+interface ConfiguredService {
+  name: string;
+  // Whether this service needs credentials (services option) to construct —
+  // CalendarApp/Session touch real Google APIs and are only reachable when
+  // the harness was given credentials to do so.
+  requiresServices: boolean;
+  create(params: SandboxBuildParams): unknown;
+}
+
+const CONFIGURED_SERVICES: ConfiguredService[] = [
+  {
+    name: 'HtmlService',
+    requiresServices: false,
+    create: ({ srcDir, htmlDir, sandbox }) => new HtmlService(htmlDir ?? srcDir, sandbox),
+  },
+  {
+    name: 'PropertiesService',
+    requiresServices: false,
+    create: ({ srcDir }) => new PropertiesService(srcDir),
+  },
+  {
+    name: 'CalendarApp',
+    requiresServices: true,
+    create: ({ services }) => {
+      if (!services) throw new Error('CalendarApp requires services to be configured');
+      return new CalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
+    },
+  },
+  {
+    name: 'Session',
+    requiresServices: true,
+    create: ({ srcDir, services }) => {
+      if (!services) throw new Error('Session requires services to be configured');
+      return new Session(services.credentialsPath, services.clientSecretPath, srcDir);
+    },
+  },
+];
 
 export interface ServiceOptions {
   credentialsPath: string;
@@ -27,16 +132,15 @@ export interface ConsumerViteConfig {
 function createSandbox(srcDir: string, services?: ServiceOptions, htmlDir?: string): vm.Context {
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
-  sandbox.HtmlService = new HtmlService(htmlDir ?? srcDir, sandbox);
-  sandbox.Utilities = Utilities;
-  sandbox.CacheService = CacheService;
-  sandbox.PropertiesService = new PropertiesService(srcDir);
-  sandbox.UrlFetchApp = UrlFetchApp;
-  sandbox.Logger = Logger;
-  if (services) {
-    sandbox.CalendarApp = new CalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
-    sandbox.Session = new Session(services.credentialsPath, services.clientSecretPath, srcDir);
+
+  Object.assign(sandbox, STATIC_SERVICES);
+
+  const params: SandboxBuildParams = { srcDir, htmlDir, sandbox, services };
+  for (const configured of CONFIGURED_SERVICES) {
+    if (configured.requiresServices && !services) continue;
+    sandbox[configured.name] = configured.create(params);
   }
+
   return sandbox;
 }
 

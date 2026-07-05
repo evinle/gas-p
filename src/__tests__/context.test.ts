@@ -40,6 +40,13 @@ describe('buildContext', () => {
     expect(typeof sandbox.Logger.log).toBe('function');
   });
 
+  it('exposes a newly-scaffolded stub-only service (SpreadsheetApp) as a sandbox global that throws GasPNotImplementedError', () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = buildContext(dir);
+    expect(() => sandbox.SpreadsheetApp.getActiveSpreadsheet()).toThrow(/SpreadsheetApp/);
+    expect(() => sandbox.SpreadsheetApp.getActiveSpreadsheet()).toThrow(/getActiveSpreadsheet/);
+  });
+
   it('exposes PropertiesService as a sandbox global with no services option needed', () => {
     // Only checks reachability, without calling getScriptProperties() — doing
     // so would write a gas-p.properties.json into this committed fixture dir.
