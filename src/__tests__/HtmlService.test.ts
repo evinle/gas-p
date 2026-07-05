@@ -39,23 +39,65 @@ describe('HtmlOutput unimplemented methods', () => {
     const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
     expect(() => output.append('more')).toThrow(GasPNotImplementedError);
   });
+});
 
-  it('addMetaTag throws GasPNotImplementedError', () => {
+describe('HtmlOutput width/height', () => {
+  it('default to null and are settable/gettable, chainably', () => {
     const sandbox = buildContext(FIXTURE);
     const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
-    expect(() => output.addMetaTag('viewport', 'width=device-width')).toThrow(GasPNotImplementedError);
+    expect(output.getWidth()).toBeNull();
+    expect(output.getHeight()).toBeNull();
+
+    const returned = output.setWidth(400).setHeight(300);
+    expect(returned).toBe(output);
+    expect(output.getWidth()).toBe(400);
+    expect(output.getHeight()).toBe(300);
   });
+});
 
-  it('setFaviconUrl throws GasPNotImplementedError', () => {
+describe('HtmlOutput favicon URL', () => {
+  it('defaults to null and is settable/gettable, chainably', () => {
     const sandbox = buildContext(FIXTURE);
     const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
-    expect(() => output.setFaviconUrl('https://example.com/favicon.ico')).toThrow(GasPNotImplementedError);
+    expect(output.getFaviconUrl()).toBeNull();
+
+    const returned = output.setFaviconUrl('https://example.com/favicon.ico');
+    expect(returned).toBe(output);
+    expect(output.getFaviconUrl()).toBe('https://example.com/favicon.ico');
   });
+});
 
-  it('setXFrameOptionsMode throws GasPNotImplementedError', () => {
+describe('HtmlOutput meta tags', () => {
+  it('addMetaTag is chainable and getMetaTags returns entries with getName()/getContent()', () => {
     const sandbox = buildContext(FIXTURE);
     const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
-    expect(() => output.setXFrameOptionsMode('ALLOWALL')).toThrow(GasPNotImplementedError);
+    expect(output.getMetaTags()).toEqual([]);
+
+    const returned = output.addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    expect(returned).toBe(output);
+
+    const tags = output.getMetaTags();
+    expect(tags).toHaveLength(1);
+    expect(tags[0].getName()).toBe('viewport');
+    expect(tags[0].getContent()).toBe('width=device-width, initial-scale=1');
+  });
+});
+
+describe('HtmlOutput.setSandboxMode()', () => {
+  it('is a chainable no-op, per the "now has no effect" docs', () => {
+    const sandbox = buildContext(FIXTURE);
+    const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
+    const returned = output.setSandboxMode(sandbox.HtmlService.SandboxMode.IFRAME);
+    expect(returned).toBe(output);
+  });
+});
+
+describe('HtmlOutput.setXFrameOptionsMode()', () => {
+  it('is chainable and accepts HtmlService.XFrameOptionsMode values', () => {
+    const sandbox = buildContext(FIXTURE);
+    const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
+    const returned = output.setXFrameOptionsMode(sandbox.HtmlService.XFrameOptionsMode.ALLOWALL);
+    expect(returned).toBe(output);
   });
 });
 

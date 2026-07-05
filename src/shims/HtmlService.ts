@@ -28,8 +28,27 @@ function evaluateTemplate(raw: string, context: vm.Context): string {
   });
 }
 
+class HtmlOutputMetaTag {
+  constructor(
+    private name: string,
+    private content: string
+  ) {}
+
+  getName(): string {
+    return this.name;
+  }
+
+  getContent(): string {
+    return this.content;
+  }
+}
+
 export class HtmlOutput extends HtmlOutputStubs {
   private title: string | undefined;
+  private width: number | null = null;
+  private height: number | null = null;
+  private faviconUrl: string | null = null;
+  private metaTags: HtmlOutputMetaTag[] = [];
 
   constructor(private content: string) {
     super();
@@ -45,6 +64,63 @@ export class HtmlOutput extends HtmlOutputStubs {
 
   setTitle(newTitle: string): HtmlOutput {
     this.title = newTitle;
+    return this;
+  }
+
+  // "Gets the initial width of the custom dialog..." — HtmlOutput docs.
+  getWidth(): number | null {
+    return this.width;
+  }
+
+  setWidth(width: number): HtmlOutput {
+    this.width = width;
+    return this;
+  }
+
+  // "Gets the initial height of the custom dialog..." — HtmlOutput docs.
+  getHeight(): number | null {
+    return this.height;
+  }
+
+  setHeight(height: number): HtmlOutput {
+    this.height = height;
+    return this;
+  }
+
+  // "Gets the URL for a favicon link tag added to the page by calling
+  // setFaviconUrl(iconUrl)." — HtmlOutput docs.
+  getFaviconUrl(): string | null {
+    return this.faviconUrl;
+  }
+
+  setFaviconUrl(iconUrl: string): HtmlOutput {
+    this.faviconUrl = iconUrl;
+    return this;
+  }
+
+  addMetaTag(name: string, content: string): HtmlOutput {
+    this.metaTags.push(new HtmlOutputMetaTag(name, content));
+    return this;
+  }
+
+  // "Gets an array of objects that represent meta tags added to the page by
+  // calling addMetaTag(name, content)." — HtmlOutput docs. Each entry
+  // exposes getName()/getContent(), matching the real HtmlOutputMetaTag
+  // shape rather than a plain {name, content} object.
+  getMetaTags(): HtmlOutputMetaTag[] {
+    return this.metaTags;
+  }
+
+  // "This method now has no effect — previously it set the sandbox mode
+  // used for client-side scripts." — HtmlOutput docs.
+  setSandboxMode(): HtmlOutput {
+    return this;
+  }
+
+  // Real header behavior isn't wired up (no live doGet response to attach an
+  // X-Frame-Options header to yet); tracking the value is enough to satisfy
+  // the chainable-setter contract scripts rely on.
+  setXFrameOptionsMode(): HtmlOutput {
     return this;
   }
 }
@@ -71,6 +147,12 @@ class HtmlTemplate extends HtmlTemplateStubs {
 // own vm.Context to run <?= ?> scriptlet expressions against the script's own
 // globals — unlike the rest of this shim, it can't be decoupled from the vm.
 export class HtmlService extends HtmlServiceStubs {
+  // Data properties on the real GAS HtmlService interface (not methods), so
+  // the stub generator's method-surface extraction never sees them — scripts
+  // need real values here to pass to setSandboxMode()/setXFrameOptionsMode().
+  readonly SandboxMode = { EMULATED: 'EMULATED', IFRAME: 'IFRAME', NATIVE: 'NATIVE' };
+  readonly XFrameOptionsMode = { ALLOWALL: 'ALLOWALL', DEFAULT: 'DEFAULT' };
+
   constructor(
     private srcDir: string,
     private context: vm.Context
