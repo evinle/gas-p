@@ -30,16 +30,16 @@ beforeEach(() => { vi.resetAllMocks(); });
 
 describe('CalendarApp.getCalendarById()', () => {
   it('returns a Calendar with getEvents and createEvent methods', async () => {
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
     const cal = CalendarApp.getCalendarById('cal123');
     expect(typeof cal.getEvents).toBe('function');
     expect(typeof cal.createEvent).toBe('function');
   });
 
   it('throws before spawning a subprocess if the ID is not in devResourceIds.CalendarApp', async () => {
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
     expect(() => CalendarApp.getCalendarById('not-allowlisted')).toThrow(/not-allowlisted/);
     expect(mockExecFileSync).not.toHaveBeenCalled();
   });
@@ -48,16 +48,16 @@ describe('CalendarApp.getCalendarById()', () => {
 describe('Calendar.getEvents()', () => {
   it('returns CalendarEvents from the API response', async () => {
     mockExecFileSync.mockReturnValue(JSON.stringify({ items: [RAW_EVENT] }));
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
     const events = CalendarApp.getCalendarById('cal123').getEvents(START, END);
     expect(events).toHaveLength(1);
   });
 
   it('returns events with correct title and times', async () => {
     mockExecFileSync.mockReturnValue(JSON.stringify({ items: [RAW_EVENT] }));
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
     const [event] = CalendarApp.getCalendarById('cal123').getEvents(START, END);
     expect(event.getTitle()).toBe('Team Standup');
     expect(event.getSummary()).toBe('Team Standup');
@@ -67,8 +67,8 @@ describe('Calendar.getEvents()', () => {
 
   it('fetches only once when getEvents is called multiple times', async () => {
     mockExecFileSync.mockReturnValue(JSON.stringify({ items: [RAW_EVENT] }));
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
     const cal = CalendarApp.getCalendarById('cal123');
     cal.getEvents(START, END);
     cal.getEvents(START, END);
@@ -79,8 +79,8 @@ describe('Calendar.getEvents()', () => {
 describe('Calendar.createEvent()', () => {
   it('returns a CalendarEvent with the created event data', async () => {
     mockExecFileSync.mockReturnValue(JSON.stringify(RAW_CREATED_EVENT));
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
     const event = CalendarApp.getCalendarById('cal123').createEvent(
       'New Meeting',
       new Date('2026-07-01T14:00:00Z'),
@@ -94,8 +94,8 @@ describe('Calendar.createEvent()', () => {
 describe('CalendarApp.getDefaultCalendar()', () => {
   it('uses the primary calendar', async () => {
     mockExecFileSync.mockReturnValue(JSON.stringify({ items: [RAW_EVENT] }));
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
     CalendarApp.getDefaultCalendar().getEvents(START, END);
     const script = mockExecFileSync.mock.calls[0][1] as string[];
     expect(script).toBeDefined();
@@ -104,8 +104,8 @@ describe('CalendarApp.getDefaultCalendar()', () => {
   });
 
   it('throws before spawning a subprocess if "primary" is not in devResourceIds.CalendarApp', async () => {
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', { CalendarApp: ['cal123'] });
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', { CalendarApp: ['cal123'] });
     expect(() => CalendarApp.getDefaultCalendar()).toThrow(/primary/);
     expect(mockExecFileSync).not.toHaveBeenCalled();
   });
@@ -113,8 +113,8 @@ describe('CalendarApp.getDefaultCalendar()', () => {
 
 describe('CalendarApp unimplemented methods', () => {
   it('getCalendarsByName throws GasPNotImplementedError', async () => {
-    const { createCalendarApp } = await import('../shims/CalendarApp.js');
-    const CalendarApp = createCalendarApp('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', ALLOWLIST);
     expect(() => CalendarApp.getCalendarsByName('foo')).toThrow('CalendarApp.getCalendarsByName() is not yet implemented');
   });
 });

@@ -4,7 +4,7 @@ import { join, extname } from 'node:path';
 import { build } from 'vite';
 import type { InlineConfig } from 'vite';
 import type { OutputChunk, RollupOutput } from 'rollup';
-import { createCalendarApp } from '../shims/CalendarApp.js';
+import { CalendarApp } from '../shims/CalendarApp.js';
 import { Utilities } from '../shims/Utilities.js';
 import { CacheService } from '../shims/CacheService.js';
 import { createSession } from '../shims/Session.js';
@@ -34,7 +34,7 @@ function createSandbox(srcDir: string, services?: ServiceOptions, htmlDir?: stri
   sandbox.UrlFetchApp = UrlFetchApp;
   sandbox.Logger = Logger;
   if (services) {
-    sandbox.CalendarApp = createCalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
+    sandbox.CalendarApp = new CalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
     sandbox.Session = createSession(services.credentialsPath, services.clientSecretPath, srcDir);
   }
   return sandbox;

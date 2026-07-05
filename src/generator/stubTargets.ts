@@ -29,18 +29,21 @@ export const stubTargets: StubTarget[] = [
     qualifiedInterfaceName: 'GoogleAppsScript.Calendar.CalendarApp',
     outputName: 'CalendarApp',
     existingShimFile: join(SRC_ROOT, 'shims/CalendarApp.ts'),
+    outputFormat: 'class',
   },
   {
     typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.calendar.d.ts'),
     qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Calendar',
     outputName: 'Calendar',
     existingShimFile: join(SRC_ROOT, 'shims/CalendarApp.ts'),
+    outputFormat: 'class',
   },
   {
     typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.calendar.d.ts'),
     qualifiedInterfaceName: 'GoogleAppsScript.Calendar.CalendarEvent',
     outputName: 'CalendarEvent',
     existingShimFile: join(SRC_ROOT, 'shims/CalendarApp.ts'),
+    outputFormat: 'class',
   },
   {
     typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.utilities.d.ts'),
