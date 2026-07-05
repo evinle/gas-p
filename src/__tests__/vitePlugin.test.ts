@@ -269,4 +269,14 @@ describe('gasPVitePlugin', () => {
     expect(res.body).toContain('<meta name="viewport" content="width=device-width"/>');
     expect(res.body).toContain('<link rel="shortcut icon" type="image/png" href="https://example.com/icon.png"/>');
   });
+
+  it('serves an X-Frame-Options: SAMEORIGIN header by default', async () => {
+    const res = await servePage('plain-html');
+    expect(res.headers['X-Frame-Options']).toBe('SAMEORIGIN');
+  });
+
+  it('omits the X-Frame-Options header when setXFrameOptionsMode(ALLOWALL) is used', async () => {
+    const res = await servePage('xframe-allowall');
+    expect(res.headers['X-Frame-Options']).toBeUndefined();
+  });
 });

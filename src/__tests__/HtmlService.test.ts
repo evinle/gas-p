@@ -111,6 +111,15 @@ describe('HtmlOutput.setXFrameOptionsMode()', () => {
     const returned = output.setXFrameOptionsMode(sandbox.HtmlService.XFrameOptionsMode.ALLOWALL);
     expect(returned).toBe(output);
   });
+
+  it('defaults to DEFAULT, and stores ALLOWALL once set, retrievable via getXFrameOptionsMode()', () => {
+    const sandbox = buildContext({ srcDir: FIXTURE });
+    const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
+    expect(output.getXFrameOptionsMode()).toBe(sandbox.HtmlService.XFrameOptionsMode.DEFAULT);
+
+    output.setXFrameOptionsMode(sandbox.HtmlService.XFrameOptionsMode.ALLOWALL);
+    expect(output.getXFrameOptionsMode()).toBe(sandbox.HtmlService.XFrameOptionsMode.ALLOWALL);
+  });
 });
 
 describe('HtmlOutput.clear() and setContent()', () => {

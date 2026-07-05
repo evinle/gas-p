@@ -122,10 +122,18 @@ export function gasPVitePlugin(options: GasPPluginOptions): Plugin {
           return;
         }
 
-        const html = await source.renderDoGet(extractUserAgent(req));
+        const { html, xFrameOptionsMode } = await source.renderDoGet(extractUserAgent(req));
         const transformed = await server.transformIndexHtml(req.url, html);
 
-        res.writeHead(200, { 'Content-Type': 'text/html' });
+        // Verified against real Apps Script deployments (see ADR 0008):
+        // ALLOWALL serves with no X-Frame-Options header at all; every other
+        // mode (DEFAULT, or none set) serves with SAMEORIGIN.
+        const headers: Record<string, string> = { 'Content-Type': 'text/html' };
+        if (xFrameOptionsMode !== 'ALLOWALL') {
+          headers['X-Frame-Options'] = 'SAMEORIGIN';
+        }
+
+        res.writeHead(200, headers);
         res.end(transformed);
       });
 

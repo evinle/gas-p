@@ -60,7 +60,14 @@ function injectHeadTags(html: string, output: HtmlOutput): string {
   return html.slice(0, insertAt) + tags.join('') + html.slice(insertAt);
 }
 
-function invokeDoGet(context: vm.Context): string {
+export interface DoGetResult {
+  html: string;
+  // Tracked separately from html because it's served as a response header
+  // (see vitePlugin.ts), not embedded in the page content itself.
+  xFrameOptionsMode: string;
+}
+
+function invokeDoGet(context: vm.Context): DoGetResult {
   try {
     const doGet = context.doGet;
     if (typeof doGet !== 'function') {
@@ -71,7 +78,10 @@ function invokeDoGet(context: vm.Context): string {
     if (!isHtmlOutput(result)) {
       throw new Error('doGet() did not return an HtmlOutput');
     }
-    return injectHeadTags(result.getContent(), result);
+    return {
+      html: injectHeadTags(result.getContent(), result),
+      xFrameOptionsMode: result.getXFrameOptionsMode(),
+    };
   } catch (error) {
     rethrowInHostRealm(error);
   }
@@ -79,12 +89,12 @@ function invokeDoGet(context: vm.Context): string {
 
 export function renderDoGet(config: BuildContextConfig, userAgent?: string): string {
   const context = buildContext(config, userAgent);
-  return invokeDoGet(context);
+  return invokeDoGet(context).html;
 }
 
 export async function renderDoGetBundled(config: BuildBundledContextConfig, userAgent?: string): Promise<string> {
   const context = await buildBundledContext(config, userAgent);
-  return invokeDoGet(context);
+  return invokeDoGet(context).html;
 }
 
 export interface GasPSource {
@@ -92,7 +102,7 @@ export interface GasPSource {
   // config, which is resolved once at server startup), so it's threaded
   // through as an argument to each call rather than captured by resolveSource.
   buildContext(userAgent?: string): Promise<vm.Context>;
-  renderDoGet(userAgent?: string): Promise<string>;
+  renderDoGet(userAgent?: string): Promise<DoGetResult>;
 }
 
 export interface SourceConfig extends BuildContextConfig {
@@ -110,11 +120,11 @@ export function resolveSource(config: SourceConfig): GasPSource {
     const bundledConfig: BuildBundledContextConfig = { ...rest, entry };
     return {
       buildContext: (userAgent) => buildBundledContext(bundledConfig, userAgent),
-      renderDoGet: (userAgent) => renderDoGetBundled(bundledConfig, userAgent),
+      renderDoGet: (userAgent) => buildBundledContext(bundledConfig, userAgent).then(invokeDoGet),
     };
   }
   return {
     buildContext: (userAgent) => Promise.resolve(buildContext(rest, userAgent)),
-    renderDoGet: (userAgent) => Promise.resolve(renderDoGet(rest, userAgent)),
+    renderDoGet: (userAgent) => Promise.resolve(invokeDoGet(buildContext(rest, userAgent))),
   };
 }

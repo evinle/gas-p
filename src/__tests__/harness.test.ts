@@ -96,10 +96,16 @@ describe('renderDoGetBundled', () => {
 describe('resolveSource', () => {
   it('uses the raw .gs/.js path when entry is undefined', async () => {
     const source = resolveSource({ srcDir: join(FIXTURES, 'plain-html') });
-    const html = await source.renderDoGet();
-    expect(html).toBe(
+    const result = await source.renderDoGet();
+    expect(result.html).toBe(
       ['<html>', '  <body>', '    <h1>Hello gas-p</h1>', '  </body>', '</html>', ''].join('\n')
     );
+  });
+
+  it("exposes the doGet result's xFrameOptionsMode alongside html, for the Vite plugin to set the served header", async () => {
+    const source = resolveSource({ srcDir: join(FIXTURES, 'plain-html') });
+    const result = await source.renderDoGet();
+    expect(result.xFrameOptionsMode).toBe('DEFAULT');
   });
 
   it('uses the bundled .ts path when entry is given', async () => {
@@ -112,8 +118,8 @@ describe('resolveSource', () => {
     const dir = join(CONTEXT_FIXTURES, 'html-dir-override', 'entry-ts');
     const htmlDir = join(CONTEXT_FIXTURES, 'html-dir-override', 'views');
     const source = resolveSource({ srcDir: dir, entry: 'Code.ts', htmlDir });
-    const html = await source.renderDoGet();
-    expect(html).toBe('<p>from the views dir, not the entry dir</p>\n');
+    const result = await source.renderDoGet();
+    expect(result.html).toBe('<p>from the views dir, not the entry dir</p>\n');
   });
 
   it('threads a per-call user agent through to HtmlService.getUserAgent()', async () => {

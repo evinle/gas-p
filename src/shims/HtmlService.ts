@@ -50,6 +50,7 @@ export class HtmlOutput extends HtmlOutputStubs {
   private height: number | null = null;
   private faviconUrl: string | null = null;
   private metaTags: HtmlOutputMetaTag[] = [];
+  private xFrameOptionsMode = 'DEFAULT';
 
   constructor(
     private content: string,
@@ -151,12 +152,20 @@ export class HtmlOutput extends HtmlOutputStubs {
     return this;
   }
 
-  // Deliberately left as a no-op — real Apps Script execution showed no
-  // X-Frame-Options header at all for the DEFAULT case (contradicting both
-  // the vague docs and the commonly-claimed SAMEORIGIN value), so there's no
-  // verified contract to implement against. See ADR 0006.
-  setXFrameOptionsMode(): HtmlOutput {
+  // "Sets the state for whether the page allows itself to be put in an
+  // iframe." — HtmlOutput docs. Verified against real Apps Script execution
+  // (see ADR 0008): DEFAULT serves with X-Frame-Options: SAMEORIGIN;
+  // ALLOWALL serves with no X-Frame-Options header at all. getXFrameOptionsMode()
+  // isn't part of the real GAS surface (no getter exists there) — it's a
+  // gas-p-internal addition so harness.ts/vitePlugin.ts can read the tracked
+  // value back off the returned HtmlOutput to set the served response header.
+  setXFrameOptionsMode(mode: string): HtmlOutput {
+    this.xFrameOptionsMode = mode;
     return this;
+  }
+
+  getXFrameOptionsMode(): string {
+    return this.xFrameOptionsMode;
   }
 
   // "Returns an HtmlTemplate backed by this HtmlOutput ... Future changes to
