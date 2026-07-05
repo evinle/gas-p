@@ -237,4 +237,36 @@ describe('gasPVitePlugin', () => {
     await handler(req, res, vi.fn());
     expect(JSON.parse(res.body)).toEqual({ ok: true, value: 'ExampleBrowser/1.0' });
   });
+
+  async function servePage(harnessFixtureDir: string) {
+    const plugin = gasPVitePlugin({
+      srcDir: join(__dirname, '__fixtures__', 'harness', harnessFixtureDir),
+      endpoint: '/__gasp/rpc',
+    });
+    const use = vi.fn();
+    const server = fakeServer(use);
+    plugin.configureServer(server);
+    const [pageHandler] = use.mock.calls.find((call) => call.length === 1)!;
+
+    const req = fakeRequest('GET', undefined, { url: '/' });
+    const res = fakeResponse();
+    await pageHandler(req, res, vi.fn());
+    return res;
+  }
+
+  it('serves HtmlOutput.append()ed content through a real doGet() round trip', async () => {
+    const res = await servePage('append');
+    expect(res.body).toContain('<p>hi</p><p>bye</p>');
+  });
+
+  it('serves HtmlService.createTemplate() scriptlet output through a real doGet() round trip', async () => {
+    const res = await servePage('create-template');
+    expect(res.body).toContain('<p>Hello, World!</p>');
+  });
+
+  it('serves addMetaTag/setFaviconUrl tags injected into <head> through a real doGet() round trip', async () => {
+    const res = await servePage('meta-favicon-with-head');
+    expect(res.body).toContain('<meta name="viewport" content="width=device-width"/>');
+    expect(res.body).toContain('<link rel="shortcut icon" type="image/png" href="https://example.com/icon.png"/>');
+  });
 });

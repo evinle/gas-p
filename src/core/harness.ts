@@ -4,6 +4,7 @@ import {
   isHtmlOutput,
   type BuildContextConfig,
   type BuildBundledContextConfig,
+  type HtmlOutput,
 } from './context.js';
 import type vm from 'node:vm';
 
@@ -36,6 +37,29 @@ export function rethrowInHostRealm(error: unknown): never {
   throw error;
 }
 
+// Real Apps Script injects addMetaTag()/setFaviconUrl() tags into the served
+// page's <head> without mutating HtmlOutput.getContent() itself (verified
+// against a real deployment — getContent() logged unchanged, but the actual
+// served HTML's <head> had the tags). This mirrors that: it builds the served
+// string separately, leaving getContent() pure.
+function injectHeadTags(html: string, output: HtmlOutput): string {
+  const tags = [
+    ...output.getMetaTags().map((tag) => `<meta name="${tag.getName()}" content="${tag.getContent()}"/>`),
+  ];
+  const faviconUrl = output.getFaviconUrl();
+  if (faviconUrl !== null) {
+    tags.push(`<link rel="shortcut icon" type="image/png" href="${faviconUrl}"/>`);
+  }
+  if (tags.length === 0) return html;
+
+  const headMatch = /<head[^>]*>/i.exec(html);
+  if (!headMatch) {
+    return `<head>${tags.join('')}</head>${html}`;
+  }
+  const insertAt = headMatch.index + headMatch[0].length;
+  return html.slice(0, insertAt) + tags.join('') + html.slice(insertAt);
+}
+
 function invokeDoGet(context: vm.Context): string {
   try {
     const doGet = context.doGet;
@@ -47,7 +71,7 @@ function invokeDoGet(context: vm.Context): string {
     if (!isHtmlOutput(result)) {
       throw new Error('doGet() did not return an HtmlOutput');
     }
-    return result.getContent();
+    return injectHeadTags(result.getContent(), result);
   } catch (error) {
     rethrowInHostRealm(error);
   }

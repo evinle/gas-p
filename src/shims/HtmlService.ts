@@ -110,7 +110,9 @@ export class HtmlOutput extends HtmlOutputStubs {
   // "Gets an array of objects that represent meta tags added to the page by
   // calling addMetaTag(name, content)." — HtmlOutput docs. Each entry
   // exposes getName()/getContent(), matching the real HtmlOutputMetaTag
-  // shape rather than a plain {name, content} object.
+  // shape rather than a plain {name, content} object. This tracked state
+  // (not getContent() itself) is what harness.ts's injectHeadTags() reads to
+  // build the served page's <head> — see ADR 0007.
   getMetaTags(): HtmlOutputMetaTag[] {
     return this.metaTags;
   }
@@ -149,9 +151,10 @@ export class HtmlOutput extends HtmlOutputStubs {
     return this;
   }
 
-  // Real header behavior isn't wired up (no live doGet response to attach an
-  // X-Frame-Options header to yet); tracking the value is enough to satisfy
-  // the chainable-setter contract scripts rely on.
+  // Deliberately left as a no-op — real Apps Script execution showed no
+  // X-Frame-Options header at all for the DEFAULT case (contradicting both
+  // the vague docs and the commonly-claimed SAMEORIGIN value), so there's no
+  // verified contract to implement against. See ADR 0006.
   setXFrameOptionsMode(): HtmlOutput {
     return this;
   }

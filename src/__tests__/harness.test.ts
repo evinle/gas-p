@@ -37,6 +37,20 @@ describe('renderDoGet', () => {
     );
   });
 
+  it('injects addMetaTag/setFaviconUrl tags into an existing <head>, matching real Apps Script serving behavior', () => {
+    const html = renderDoGet({ srcDir: join(FIXTURES, 'meta-favicon-with-head') });
+    expect(html).toBe(
+      [
+        '<html><head><meta name="viewport" content="width=device-width"/><link rel="shortcut icon" type="image/png" href="https://example.com/icon.png"/></head><body><p>hi</p></body></html>',
+      ].join('\n')
+    );
+  });
+
+  it('creates and prepends a <head> when addMetaTag is used but the content has no <head> of its own', () => {
+    const html = renderDoGet({ srcDir: join(FIXTURES, 'meta-favicon-no-head') });
+    expect(html).toBe('<head><meta name="viewport" content="width=device-width"/></head><p>hi</p>');
+  });
+
   it('does not persist module-level state across separate renderDoGet calls', () => {
     const counterDir = join(FIXTURES, 'counter');
     const first = renderDoGet({ srcDir: counterDir });
