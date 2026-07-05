@@ -34,22 +34,31 @@ No type assertions (`as SomeType`). Write explicit guard functions that check bo
 
 Every method on the real `@types/google-apps-script` surface exists somewhere in `src/shims/` — either as a real implementation, or as a generated stub that throws `GasPNotImplementedError`.
 
-1. **Find the stub.** Generated stubs live in `src/shims/generated/<Interface>.stubs.ts`, one file per GAS interface (e.g. `CacheService.stubs.ts` for the `CacheService` singleton, `Cache.stubs.ts` for the object it returns from `getScriptCache()`). Search for the method name there, or just call it and read the `GasPNotImplementedError` message — it names the interface and method directly.
-2. **Replace it with a real implementation.** The hand-written shim module for that service (e.g. `src/shims/CacheService.ts`) spreads the generated stub object and then overrides individual methods:
+1. **Find the stub.** Generated stubs live in `src/shims/generated/<Interface>.stubs.ts`, one abstract class per GAS interface (e.g. `CacheServiceStubs` in `CacheService.stubs.ts` for the `CacheService` singleton, `CacheStubs` in `Cache.stubs.ts` for the object it returns from `getScriptCache()`). Search for the method name there, or just call it and read the `GasPNotImplementedError` message — it names the interface and method directly.
+2. **Replace it with a real implementation.** The hand-written shim module for that service (e.g. `src/shims/CacheService.ts`) declares a class of the *exact same name* as the interface, `extend`ing the generated abstract stub class, and overrides individual methods as real class methods:
 
    ```ts
    import { CacheServiceStubs } from './generated/CacheService.stubs.js';
 
-   export const CacheService = {
-     ...CacheServiceStubs,
+   class CacheService extends CacheServiceStubs {
      getUserCache() {
        /* real implementation */
-     },
-   };
+     }
+   }
    ```
 
-   Add your real implementation as a plain method on the exported object (or object literal, depending on the shim) — do **not** edit the generated `*.stubs.ts` file directly, it will be overwritten.
-3. **Regenerate.** Run `npm run generate:stubs` after your change. Because the generator scans the hand-written shim source for real bodies vs. `GasPNotImplementedError` throws, your newly-implemented method drops out of the generated stub file automatically. Run `npm run generate:stubs:check` before opening a PR to confirm the checked-in stubs match — it exits non-zero if `@types/google-apps-script` has moved on and stubs are stale, or if a real implementation didn't get regenerated out of the stub file. (There's no CI pipeline wired up yet to run this automatically — it's a manual step for now.)
+   Any method you don't override is inherited from `CacheServiceStubs` and still throws `GasPNotImplementedError` — do **not** edit the generated `*.stubs.ts` file directly, it will be overwritten.
+
+   The class name matters: the generator finds "what's already implemented" by scanning the shim file for a class declaration whose name exactly matches the interface (e.g. `CacheService`, `Calendar`, `HtmlOutput`) and reading its own methods — no `create<Scope>` factory naming, no config needed.
+
+   - If the service needs no per-context config (e.g. `Utilities`, `CacheService`), construct a single instance and re-export it under the class's own name so callers still get a ready-to-use object, not a class to `new` themselves:
+     ```ts
+     const instance = new CacheService();
+     export { instance as CacheService };
+     ```
+   - If the service needs config only known at harness startup (e.g. `CalendarApp`, `Session`, credentials/`srcDir`/`vm.Context`), export the class itself and construct it with `new` at its one call site in `src/core/context.ts` — no factory function needed.
+   - If the interface represents many simultaneous instances (e.g. `Calendar`, `CalendarEvent`, one per calendar/event), just `new` it wherever it's created — inside another class's method, typically — same as any other class.
+3. **Regenerate.** Run `npm run generate:stubs` after your change. Because the generator scans the hand-written shim source for real method bodies vs. `GasPNotImplementedError` throws, your newly-implemented method drops out of the generated stub class automatically. Run `npm run generate:stubs:check` before opening a PR to confirm the checked-in stubs match — it exits non-zero if `@types/google-apps-script` has moved on and stubs are stale, or if a real implementation didn't get regenerated out of the stub file. (There's no CI pipeline wired up yet to run this automatically — it's a manual step for now.)
 4. **Write a test.** Follow the existing fixture-file convention (see [Testing](#testing) above): add a case to the matching `src/__tests__/<Service>.test.ts` that exercises the method through the public shim interface, not the generator internals.
 
-The generator itself lives in `src/generator/` (`methodSurface.ts` reads the real `.d.ts` interfaces, `implementedMethods.ts` detects what's already real, `stubSource.ts` renders the stub file, `runGenerator.ts` wires them together per `stubTargets.ts`). You shouldn't need to touch it unless you're adding a new service to the generated surface — see `stubTargets.ts` for how existing services are configured.
+The generator itself lives in `src/generator/` (`methodSurface.ts` reads the real `.d.ts` interfaces, `implementedMethods.ts` detects what's already real by finding the matching class declaration, `stubSource.ts` renders the abstract stub class, `runGenerator.ts` wires them together per `stubTargets.ts`). You shouldn't need to touch it unless you're adding a new service to the generated surface — see `stubTargets.ts` for how existing services are configured (just `typesFile`/`qualifiedInterfaceName`/`outputName`/`existingShimFile`, no per-target overrides needed).
