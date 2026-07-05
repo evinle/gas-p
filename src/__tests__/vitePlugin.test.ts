@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { gasPVitePlugin } from '../adapters/vitePlugin.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -143,6 +145,74 @@ describe('gasPVitePlugin', () => {
     const res = fakeResponse();
     const next = vi.fn();
     await handler(req, res, next);
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, value: 5 });
+  });
+
+  it('answers an RPC call from a fixture declared in the project root\'s gas-p.fixtures.ts', async () => {
+    const projectRoot = join(__dirname, '__fixtures__', 'vite-plugin-fixtures', 'basic');
+    const plugin = gasPVitePlugin({ srcDir: join(projectRoot, 'app-src'), endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    await plugin.configureServer(fakeServer(use, { root: projectRoot }));
+
+    const [, handler] = use.mock.calls.find((call) => call.length === 2)!;
+    const req = fakeRequest('POST', { fnName: 'readFixture', args: [] });
+    const res = fakeResponse();
+    await handler(req, res, vi.fn());
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, value: 'fixture value' });
+  });
+
+  it('answers a doGet-rendering call from a fixture declared in the project root\'s gas-p.fixtures.ts', async () => {
+    const projectRoot = join(__dirname, '__fixtures__', 'vite-plugin-fixtures', 'basic');
+    const plugin = gasPVitePlugin({ srcDir: join(projectRoot, 'app-src'), endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    const server = fakeServer(use, { root: projectRoot });
+    await plugin.configureServer(server);
+
+    const [pageHandler] = use.mock.calls.find((call) => call.length === 1)!;
+    const req = fakeRequest('GET', undefined, { url: '/' });
+    const res = fakeResponse();
+    await pageHandler(req, res, vi.fn());
+
+    expect(res.body).toContain('<p>fixture value</p>');
+  });
+
+  it('reflects an edit to gas-p.fixtures.ts on the next request, with no server restart', async () => {
+    const projectRoot = join(__dirname, '__fixtures__', 'vite-plugin-fixtures', 'basic');
+    const scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-vite-fixtures-'));
+    const fixturesFile = join(scratchDir, 'gas-p.fixtures.ts');
+    try {
+      writeFileSync(fixturesFile, "export default { SpreadsheetApp: { someUnimplementedMethod: 'first' } };");
+      const plugin = gasPVitePlugin({ srcDir: join(projectRoot, 'app-src'), endpoint: '/__gasp/rpc', fixturesFile });
+      const use = vi.fn();
+      await plugin.configureServer(fakeServer(use));
+      const [, handler] = use.mock.calls.find((call) => call.length === 2)!;
+
+      const firstReq = fakeRequest('POST', { fnName: 'readFixture', args: [] });
+      const firstRes = fakeResponse();
+      await handler(firstReq, firstRes, vi.fn());
+      expect(JSON.parse(firstRes.body)).toEqual({ ok: true, value: 'first' });
+
+      writeFileSync(fixturesFile, "export default { SpreadsheetApp: { someUnimplementedMethod: 'second' } };");
+      const secondReq = fakeRequest('POST', { fnName: 'readFixture', args: [] });
+      const secondRes = fakeResponse();
+      await handler(secondReq, secondRes, vi.fn());
+      expect(JSON.parse(secondRes.body)).toEqual({ ok: true, value: 'second' });
+    } finally {
+      rmSync(scratchDir, { recursive: true, force: true });
+    }
+  });
+
+  it('behaves exactly as today, with no error, when no gas-p.fixtures.ts exists at the project root', async () => {
+    const plugin = gasPVitePlugin({ srcDir: join(FIXTURES, 'basic'), endpoint: '/__gasp/rpc' });
+    const use = vi.fn();
+    await plugin.configureServer(fakeServer(use));
+
+    const [, handler] = use.mock.calls.find((call) => call.length === 2)!;
+    const req = fakeRequest('POST', { fnName: 'add', args: [2, 3] });
+    const res = fakeResponse();
+    await handler(req, res, vi.fn());
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, value: 5 });
   });

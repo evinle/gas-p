@@ -41,6 +41,7 @@ export interface GasPPluginOptions {
   endpoint?: string;
   page?: string;
   configFile?: string;
+  fixturesFile?: string;
   htmlDir?: string;
   credentialsPath?: string;
   clientSecretPath?: string;
@@ -111,7 +112,13 @@ export function gasPVitePlugin(options: GasPPluginOptions): Plugin {
         resolve: server.config.resolve,
         plugins: (server.config.plugins ?? []).filter(isConsumerPlugin) as ConsumerViteConfig['plugins'],
       };
-      const source = resolveSource({ srcDir, entry, consumerConfig, services, htmlDir: options.htmlDir });
+      // Resolved once here, at server start, same as configFile above — but
+      // unlike configFile, this path is only ever *read* per request (never
+      // cached): buildContext/buildBundledContext call loadFixtures(fresh)
+      // on every invocation (see ADR 0009), so the file's contents can
+      // change between requests with no dev-server restart required.
+      const fixturesFile = options.fixturesFile ?? join(server.config.root, 'gas-p.fixtures.ts');
+      const source = resolveSource({ srcDir, entry, consumerConfig, services, htmlDir: options.htmlDir, fixturesFile });
 
       // No path filter and no returned callback: this runs on every request,
       // ahead of Vite's own HTML middleware, so a raw <?= ?> scriptlet
