@@ -33,11 +33,23 @@ describe('HtmlService.createHtmlOutput()', () => {
   });
 });
 
-describe('HtmlOutput unimplemented methods', () => {
-  it('append throws GasPNotImplementedError', () => {
+describe('HtmlOutput.append()', () => {
+  it('appends content as-is, unescaped, and is chainable', () => {
     const sandbox = buildContext(FIXTURE);
     const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
-    expect(() => output.append('more')).toThrow(GasPNotImplementedError);
+    const returned = output.append('<b>more</b>');
+    expect(returned).toBe(output);
+    expect(output.getContent()).toBe('<p>hi</p><b>more</b>');
+  });
+});
+
+describe('HtmlOutput.appendUntrusted()', () => {
+  it('HTML-escapes the appended content and is chainable', () => {
+    const sandbox = buildContext(FIXTURE);
+    const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
+    const returned = output.appendUntrusted('<script>evil()</script>');
+    expect(returned).toBe(output);
+    expect(output.getContent()).toBe('<p>hi</p>&lt;script&gt;evil()&lt;/script&gt;');
   });
 });
 
@@ -98,6 +110,24 @@ describe('HtmlOutput.setXFrameOptionsMode()', () => {
     const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
     const returned = output.setXFrameOptionsMode(sandbox.HtmlService.XFrameOptionsMode.ALLOWALL);
     expect(returned).toBe(output);
+  });
+});
+
+describe('HtmlOutput.clear() and setContent()', () => {
+  it('clear() empties the content and is chainable', () => {
+    const sandbox = buildContext(FIXTURE);
+    const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
+    const returned = output.clear();
+    expect(returned).toBe(output);
+    expect(output.getContent()).toBe('');
+  });
+
+  it('setContent() replaces the content and is chainable', () => {
+    const sandbox = buildContext(FIXTURE);
+    const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
+    const returned = output.setContent('<p>replaced</p>');
+    expect(returned).toBe(output);
+    expect(output.getContent()).toBe('<p>replaced</p>');
   });
 });
 

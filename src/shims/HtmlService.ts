@@ -117,6 +117,34 @@ export class HtmlOutput extends HtmlOutputStubs {
     return this;
   }
 
+  // "Appends new content to the content of this HtmlOutput. Use this only
+  // for content from a trusted source, because it is not escaped." — docs.
+  append(addedContent: string): HtmlOutput {
+    this.content += addedContent;
+    return this;
+  }
+
+  // "Appends new content ... using contextual escaping." — docs. Real GAS
+  // escapes based on surrounding HTML context (text/attribute/script/etc);
+  // this only covers the plain-HTML-text case (same escaping as a <?= ?>
+  // scriptlet), not full contextual autoescaping.
+  appendUntrusted(addedContent: string): HtmlOutput {
+    this.content += escapeHtml(addedContent);
+    return this;
+  }
+
+  // "Clears the current content." — HtmlOutput docs.
+  clear(): HtmlOutput {
+    this.content = '';
+    return this;
+  }
+
+  // "Sets the content of this HtmlOutput." — HtmlOutput docs.
+  setContent(content: string): HtmlOutput {
+    this.content = content;
+    return this;
+  }
+
   // Real header behavior isn't wired up (no live doGet response to attach an
   // X-Frame-Options header to yet); tracking the value is enough to satisfy
   // the chainable-setter contract scripts rely on.
