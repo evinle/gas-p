@@ -4,37 +4,19 @@ import { findImplementedMethods } from '../generator/implementedMethods.js';
 describe('findImplementedMethods', () => {
   it('excludes methods whose body throws GasPNotImplementedError', () => {
     const source = `
-      export const CacheService = {
+      class CacheService {
         getScriptCache() {
           return scriptCache;
-        },
+        }
         getUserCache(): never {
           throw new GasPNotImplementedError('CacheService', 'getUserCache');
-        },
-      };
+        }
+      }
     `;
 
-    expect(findImplementedMethods(source)).toEqual(new Set(['getScriptCache']));
+    expect(findImplementedMethods(source, 'CacheService')).toEqual(new Set(['getScriptCache']));
   });
 
-  it('recognizes standalone function declarations referenced via object shorthand', () => {
-    const source = `
-      function get(key: string): string | null {
-        return store.get(key) ?? null;
-      }
-
-      function getAll(_keys: string[]): never {
-        throw new GasPNotImplementedError('Cache', 'getAll');
-      }
-
-      const scriptCache = { get, getAll };
-    `;
-
-    expect(findImplementedMethods(source)).toEqual(new Set(['get']));
-  });
-});
-
-describe('findImplementedMethods scoped to a container name', () => {
   it('scopes to a named class, ignoring a same-named method on another class in the same file', () => {
     const source = `
       class Calendar {
@@ -53,69 +35,9 @@ describe('findImplementedMethods scoped to a container name', () => {
     expect(findImplementedMethods(source, 'CalendarEvent')).toEqual(new Set());
   });
 
-  it('scopes to the object literal returned by a create<Scope> factory function', () => {
-    const source = `
-      function createCalendarApp() {
-        return {
-          getDefaultCalendar() {
-            return realCalendar;
-          },
-          getCalendarsByName(): never {
-            throw new GasPNotImplementedError('CalendarApp', 'getCalendarsByName');
-          },
-        };
-      }
-    `;
+  it('throws when the named class cannot be found in the source', () => {
+    const source = `class SomethingElse {}`;
 
-    expect(findImplementedMethods(source, 'CalendarApp')).toEqual(new Set(['getDefaultCalendar']));
-  });
-
-  it('scopes to an object literal assigned to a matching variable name, resolving shorthand properties to their function declarations', () => {
-    const source = `
-      function get(key: string): string | null {
-        return store.get(key) ?? null;
-      }
-      function getAll(_keys: string[]): never {
-        throw new GasPNotImplementedError('Cache', 'getAll');
-      }
-      const scriptCache = { get, getAll };
-    `;
-
-    expect(findImplementedMethods(source, 'scriptCache')).toEqual(new Set(['get']));
-  });
-
-  it('scopes to a create<Scope> factory that returns via a named local variable rather than an inline literal', () => {
-    const source = `
-      function createHtmlOutput(content: string) {
-        const output = {
-          getContent() {
-            return content;
-          },
-          append(): never {
-            throw new GasPNotImplementedError('HtmlOutput', 'append');
-          },
-        };
-        return output;
-      }
-    `;
-
-    expect(findImplementedMethods(source, 'HtmlOutput')).toEqual(new Set(['getContent']));
-  });
-
-  it('recognizes a property assignment with an arrow function value as a real implementation', () => {
-    const source = `
-      function createHtmlOutput(content: string) {
-        const output = {
-          getContent: () => content,
-          getTitle: () => undefined,
-          append(): never {
-            throw new GasPNotImplementedError('HtmlOutput', 'append');
-          },
-        };
-        return output;
-      }
-    `;
-
-    expect(findImplementedMethods(source, 'HtmlOutput')).toEqual(new Set(['getContent', 'getTitle']));
+    expect(() => findImplementedMethods(source, 'CacheService')).toThrow(/could not locate class "CacheService"/);
   });
 });

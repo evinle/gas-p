@@ -18,10 +18,7 @@ describe('runGenerator', () => {
     ];
 
     const existingSources = new Map([
-      [
-        '/fake/CacheService.ts',
-        `export const CacheService = { getScriptCache() { return scriptCache; } };`,
-      ],
+      ['/fake/CacheService.ts', `class CacheService { getScriptCache() { return scriptCache; } }`],
     ]);
 
     const result = runGenerator(targets, (path) => existingSources.get(path));
@@ -48,35 +45,33 @@ describe('runGenerator', () => {
     expect(output).toContain("'getUserCache'");
   });
 
-  it('disambiguates same-named methods across sibling containers via implementationScope', () => {
+  it('disambiguates same-named methods across sibling classes by exact class name', () => {
     const targets: StubTarget[] = [
       {
         typesFile: FIXTURE,
         qualifiedInterfaceName: 'GoogleAppsScript.Cache.CacheService',
         outputName: 'RealOne',
         existingShimFile: '/fake/shim.ts',
-        implementationScope: 'RealOne',
       },
       {
         typesFile: FIXTURE,
         qualifiedInterfaceName: 'GoogleAppsScript.Cache.CacheService',
         outputName: 'StubOne',
         existingShimFile: '/fake/shim.ts',
-        implementationScope: 'StubOne',
       },
     ];
 
     const source = `
-      export const RealOne = {
+      class RealOne {
         getScriptCache() {
           return 'a real implementation';
-        },
-      };
-      export const StubOne = {
+        }
+      }
+      class StubOne {
         getScriptCache(): never {
           throw new GasPNotImplementedError('StubOne', 'getScriptCache');
-        },
-      };
+        }
+      }
     `;
 
     const result = runGenerator(targets, () => source);
