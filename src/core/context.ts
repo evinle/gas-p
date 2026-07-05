@@ -169,7 +169,9 @@ function createSandbox(config: BuildContextConfig, userAgent?: string): vm.Conte
 
 // Builds a fresh vm context per call, matching Apps Script's per-execution
 // model: no module-level state persists across separate buildContext calls.
-export function buildContext(config: BuildContextConfig, userAgent?: string): vm.Context {
+// async (despite synchronous internals today) to match buildBundledContext's
+// shape — Declared Fixtures need a real async TS-transpiling fresh read here.
+export async function buildContext(config: BuildContextConfig, userAgent?: string): Promise<vm.Context> {
   const sandbox = createSandbox(config, userAgent);
 
   const { srcDir } = config;

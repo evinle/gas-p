@@ -87,8 +87,8 @@ function invokeDoGet(context: vm.Context): DoGetResult {
   }
 }
 
-export function renderDoGet(config: BuildContextConfig, userAgent?: string): string {
-  const context = buildContext(config, userAgent);
+export async function renderDoGet(config: BuildContextConfig, userAgent?: string): Promise<string> {
+  const context = await buildContext(config, userAgent);
   return invokeDoGet(context).html;
 }
 
@@ -124,7 +124,7 @@ export function resolveSource(config: SourceConfig): GasPSource {
     };
   }
   return {
-    buildContext: (userAgent) => Promise.resolve(buildContext(rest, userAgent)),
-    renderDoGet: (userAgent) => Promise.resolve(invokeDoGet(buildContext(rest, userAgent))),
+    buildContext: (userAgent) => buildContext(rest, userAgent),
+    renderDoGet: (userAgent) => buildContext(rest, userAgent).then(invokeDoGet),
   };
 }

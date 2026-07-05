@@ -9,14 +9,14 @@ const CONTEXT_FIXTURES = join(__dirname, '__fixtures__', 'context');
 const SESSION_FIXTURES = join(__dirname, '__fixtures__', 'session');
 
 describe('buildContext', () => {
-  it('throws a clear error when srcDir has no .gs/.js source files', () => {
+  it('throws a clear error when srcDir has no .gs/.js source files', async () => {
     const emptyDir = join(CONTEXT_FIXTURES, 'empty');
-    expect(() => buildContext({ srcDir: emptyDir })).toThrow(/No \.gs\/\.js source found in/);
+    await expect(buildContext({ srcDir: emptyDir })).rejects.toThrow(/No \.gs\/\.js source found in/);
   });
 
-  it('exposes CalendarApp as a sandbox global, gated by devResourceIds', () => {
+  it('exposes CalendarApp as a sandbox global, gated by devResourceIds', async () => {
     const dir = join(FIXTURES, 'counter');
-    const sandbox = buildContext({
+    const sandbox = await buildContext({
       srcDir: dir,
       services: {
         credentialsPath: '/fake/credentials.json',
@@ -28,40 +28,40 @@ describe('buildContext', () => {
     expect(() => sandbox.CalendarApp.getCalendarById('not-allowlisted')).toThrow(/not-allowlisted/);
   });
 
-  it('exposes Utilities and CacheService as sandbox globals with no services option needed', () => {
+  it('exposes Utilities and CacheService as sandbox globals with no services option needed', async () => {
     const dir = join(FIXTURES, 'counter');
-    const sandbox = buildContext({ srcDir: dir });
+    const sandbox = await buildContext({ srcDir: dir });
     expect(sandbox.Utilities.base64Decode('aGVsbG8=')).toEqual(Array.from(Buffer.from('hello')));
     sandbox.CacheService.getScriptCache().put('key1', 'value1');
     expect(sandbox.CacheService.getScriptCache().get('key1')).toBe('value1');
   });
 
-  it('exposes UrlFetchApp and Logger as sandbox globals with no services option needed', () => {
+  it('exposes UrlFetchApp and Logger as sandbox globals with no services option needed', async () => {
     const dir = join(FIXTURES, 'counter');
-    const sandbox = buildContext({ srcDir: dir });
+    const sandbox = await buildContext({ srcDir: dir });
     expect(typeof sandbox.UrlFetchApp.fetch).toBe('function');
     expect(typeof sandbox.Logger.log).toBe('function');
   });
 
-  it('exposes a newly-scaffolded stub-only service (SpreadsheetApp) as a sandbox global that throws GasPNotImplementedError', () => {
+  it('exposes a newly-scaffolded stub-only service (SpreadsheetApp) as a sandbox global that throws GasPNotImplementedError', async () => {
     const dir = join(FIXTURES, 'counter');
-    const sandbox = buildContext({ srcDir: dir });
+    const sandbox = await buildContext({ srcDir: dir });
     expect(() => sandbox.SpreadsheetApp.getActiveSpreadsheet()).toThrow(/SpreadsheetApp/);
     expect(() => sandbox.SpreadsheetApp.getActiveSpreadsheet()).toThrow(/getActiveSpreadsheet/);
   });
 
-  it('exposes PropertiesService as a sandbox global with no services option needed', () => {
+  it('exposes PropertiesService as a sandbox global with no services option needed', async () => {
     // Only checks reachability, without calling getScriptProperties() — doing
     // so would write a gas-p.properties.json into this committed fixture dir.
     // PropertiesService.test.ts covers read/write behavior against a scratch copy.
     const dir = join(FIXTURES, 'counter');
-    const sandbox = buildContext({ srcDir: dir });
+    const sandbox = await buildContext({ srcDir: dir });
     expect(typeof sandbox.PropertiesService.getScriptProperties).toBe('function');
   });
 
-  it('exposes Session as a sandbox global, gated by the services option', () => {
+  it('exposes Session as a sandbox global, gated by the services option', async () => {
     const dir = join(SESSION_FIXTURES, 'basic');
-    const sandbox = buildContext({
+    const sandbox = await buildContext({
       srcDir: dir,
       services: {
         credentialsPath: '/fake/credentials.json',
@@ -71,18 +71,18 @@ describe('buildContext', () => {
     expect(sandbox.Session.getScriptTimeZone()).toBe('America/New_York');
   });
 
-  it('reads HtmlOutput/template files from htmlDir instead of srcDir when htmlDir is given', () => {
+  it('reads HtmlOutput/template files from htmlDir instead of srcDir when htmlDir is given', async () => {
     const dir = join(CONTEXT_FIXTURES, 'html-dir-override', 'entry');
     const htmlDir = join(CONTEXT_FIXTURES, 'html-dir-override', 'views');
-    const sandbox = buildContext({ srcDir: dir, htmlDir });
+    const sandbox = await buildContext({ srcDir: dir, htmlDir });
     expect(sandbox.HtmlService.createHtmlOutputFromFile('index').getContent()).toBe(
       '<p>from the views dir, not the entry dir</p>\n'
     );
   });
 
-  it('exposes the given user agent via HtmlService.getUserAgent()', () => {
+  it('exposes the given user agent via HtmlService.getUserAgent()', async () => {
     const dir = join(FIXTURES, 'counter');
-    const sandbox = buildContext({ srcDir: dir }, 'ExampleBrowser/1.0');
+    const sandbox = await buildContext({ srcDir: dir }, 'ExampleBrowser/1.0');
     expect(sandbox.HtmlService.getUserAgent()).toBe('ExampleBrowser/1.0');
   });
 });
