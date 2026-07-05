@@ -37,7 +37,14 @@ Weigh every parameter added to a function signature — each one is a coupling p
 Every method on the real `@types/google-apps-script` surface exists somewhere in `src/shims/` — either as a real implementation, or as a generated stub that throws `GasPNotImplementedError`.
 
 1. **Find the stub.** Generated stubs live in `src/shims/generated/<Interface>.stubs.ts`, one abstract class per GAS interface (e.g. `CacheServiceStubs` in `CacheService.stubs.ts` for the `CacheService` singleton, `CacheStubs` in `Cache.stubs.ts` for the object it returns from `getScriptCache()`). Search for the method name there, or just call it and read the `GasPNotImplementedError` message — it names the interface and method directly.
-2. **Replace it with a real implementation.** The hand-written shim module for that service (e.g. `src/shims/CacheService.ts`) declares a class of the *exact same name* as the interface, `extend`ing the generated abstract stub class, and overrides individual methods as real class methods:
+2. **Check the real behavior — don't infer it from the type signature.** `@types/google-apps-script` only gives you argument/return *types*; it says nothing about defaults, edge cases, or side effects (e.g. what charset `Blob.getDataAsString()` defaults to, or what happens on an empty input). Look up the method on Google's official reference (`https://developers.google.com/apps-script/reference/...`) before writing the implementation, and add a one-line comment citing the doc's own wording wherever the behavior isn't obvious from the code, e.g.:
+   ```ts
+   // "Gets the data of this blob as a String with UTF-8 encoding." — Blob docs
+   getDataAsString(): string {
+     return Buffer.from(this.bytes).toString('utf-8');
+   }
+   ```
+3. **Replace it with a real implementation.** The hand-written shim module for that service (e.g. `src/shims/CacheService.ts`) declares a class of the *exact same name* as the interface, `extend`ing the generated abstract stub class, and overrides individual methods as real class methods:
 
    ```ts
    import { CacheServiceStubs } from './generated/CacheService.stubs.js';
@@ -60,8 +67,8 @@ Every method on the real `@types/google-apps-script` surface exists somewhere in
      ```
    - If the service needs config only known at harness startup (e.g. `CalendarApp`, `Session`, credentials/`srcDir`/`vm.Context`), export the class itself and construct it with `new` at its one call site in `src/core/context.ts` — no factory function needed.
    - If the interface represents many simultaneous instances (e.g. `Calendar`, `CalendarEvent`, one per calendar/event), just `new` it wherever it's created — inside another class's method, typically — same as any other class.
-3. **Regenerate.** Run `npm run generate:stubs` after your change. Because the generator scans the hand-written shim source for real method bodies vs. `GasPNotImplementedError` throws, your newly-implemented method drops out of the generated stub class automatically. Run `npm run generate:stubs:check` before opening a PR to confirm the checked-in stubs match — it exits non-zero if `@types/google-apps-script` has moved on and stubs are stale, or if a real implementation didn't get regenerated out of the stub file. (There's no CI pipeline wired up yet to run this automatically — it's a manual step for now.)
-4. **Write a test.** Follow the existing fixture-file convention (see [Testing](#testing) above): add a case to the matching `src/__tests__/<Service>.test.ts` that exercises the method through the public shim interface, not the generator internals.
+4. **Regenerate.** Run `npm run generate:stubs` after your change. Because the generator scans the hand-written shim source for real method bodies vs. `GasPNotImplementedError` throws, your newly-implemented method drops out of the generated stub class automatically. Run `npm run generate:stubs:check` before opening a PR to confirm the checked-in stubs match — it exits non-zero if `@types/google-apps-script` has moved on and stubs are stale, or if a real implementation didn't get regenerated out of the stub file. (There's no CI pipeline wired up yet to run this automatically — it's a manual step for now.)
+5. **Write a test.** Follow the existing fixture-file convention (see [Testing](#testing) above): add a case to the matching `src/__tests__/<Service>.test.ts` that exercises the method through the public shim interface, not the generator internals.
 
 The generator itself lives in `src/generator/` (`methodSurface.ts` reads the real `.d.ts` interfaces, `implementedMethods.ts` detects what's already real by finding the matching class declaration, `stubSource.ts` renders the abstract stub class, `runGenerator.ts` wires them together per `stubTargets.ts`). You shouldn't need to touch it unless you're adding a new service to the generated surface — see `stubTargets.ts` for how existing services are configured (just `typesFile`/`qualifiedInterfaceName`/`outputName`/`existingShimFile`, no per-target overrides needed).
 
@@ -83,6 +90,6 @@ The generator itself lives in `src/generator/` (`methodSurface.ts` reads the rea
 
    Every method on it throws `GasPNotImplementedError` until filled in per [Filling in a stub](#filling-in-a-stub). The generator never overwrites this file once it exists — re-running `generate:stubs` after this point behaves exactly as it does for any other service.
 
-   If the service needs config only known at harness startup (credentials, `srcDir`, ...) rather than a bare singleton, change the shim to export the class itself instead — see the config patterns under [Filling in a stub](#filling-in-a-stub) step 2.
+   If the service needs config only known at harness startup (credentials, `srcDir`, ...) rather than a bare singleton, change the shim to export the class itself instead — see the config patterns under [Filling in a stub](#filling-in-a-stub) step 3.
 3. **Wire it into the runtime sandbox.** Import the shim in `src/core/context.ts` and assign it onto `sandbox` inside `createSandbox`, so `.gs`/`.js` source can actually reach it as a global. Follow the existing pattern for services that touch real Google resources: gate construction behind `services` and (if the service can mutate/read a specific resource by ID) thread through `services.devResourceIds`, the same way `CalendarApp` is gated — see [ADR 0001](docs/adr/0001-immediate-live-semantics-no-write-queue.md) for why resource-touching services need this.
-4. **Write a test.** Same convention as step 4 of [Filling in a stub](#filling-in-a-stub).
+4. **Write a test.** Same convention as step 5 of [Filling in a stub](#filling-in-a-stub).
