@@ -131,6 +131,19 @@ describe('HtmlOutput.clear() and setContent()', () => {
   });
 });
 
+describe('HtmlOutput.asTemplate()', () => {
+  it('returns an HtmlTemplate backed by the HtmlOutput, reflecting later changes to it', () => {
+    const sandbox = buildContext(FIXTURE);
+    const output = sandbox.HtmlService.createHtmlOutput('<p>2 + 2 = <?= 2 + 2 ?></p>');
+    const template = output.asTemplate();
+
+    output.setContent('<p>3 + 3 = <?= 3 + 3 ?></p>');
+
+    expect(template.getRawContent()).toBe('<p>3 + 3 = <?= 3 + 3 ?></p>');
+    expect(template.evaluate().getContent()).toBe('<p>3 + 3 = 6</p>');
+  });
+});
+
 describe('HtmlService.createTemplate()', () => {
   it('evaluates scriptlets in a literal string the same way createTemplateFromFile does for a file', () => {
     const sandbox = buildContext(FIXTURE);

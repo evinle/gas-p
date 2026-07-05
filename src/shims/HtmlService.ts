@@ -50,7 +50,10 @@ export class HtmlOutput extends HtmlOutputStubs {
   private faviconUrl: string | null = null;
   private metaTags: HtmlOutputMetaTag[] = [];
 
-  constructor(private content: string) {
+  constructor(
+    private content: string,
+    private context: vm.Context
+  ) {
     super();
   }
 
@@ -151,23 +154,31 @@ export class HtmlOutput extends HtmlOutputStubs {
   setXFrameOptionsMode(): HtmlOutput {
     return this;
   }
+
+  // "Returns an HtmlTemplate backed by this HtmlOutput ... Future changes to
+  // HtmlOutput affect the contents of the HtmlTemplate as well." — docs. The
+  // closure reads this.content live rather than snapshotting it, so edits
+  // made via append()/setContent()/etc. after asTemplate() are reflected.
+  asTemplate(): HtmlTemplate {
+    return new HtmlTemplate(() => this.content, this.context);
+  }
 }
 
 class HtmlTemplate extends HtmlTemplateStubs {
   constructor(
-    private raw: string,
+    private getRaw: () => string,
     private context: vm.Context
   ) {
     super();
   }
 
   evaluate(): HtmlOutput {
-    return new HtmlOutput(evaluateTemplate(this.raw, this.context));
+    return new HtmlOutput(evaluateTemplate(this.getRaw(), this.context), this.context);
   }
 
   // "Returns the unprocessed content of this template." — HtmlTemplate docs.
   getRawContent(): string {
-    return this.raw;
+    return this.getRaw();
   }
 }
 
@@ -190,22 +201,22 @@ export class HtmlService extends HtmlServiceStubs {
 
   createTemplateFromFile(filename: string) {
     const raw = readFileSync(join(this.srcDir, `${filename}.html`), 'utf-8');
-    return new HtmlTemplate(raw, this.context);
+    return new HtmlTemplate(() => raw, this.context);
   }
 
   // "Creates a new HtmlTemplate object that can be returned from the
   // script." — HtmlService docs. Same scriptlet evaluation as
   // createTemplateFromFile, just from a literal string instead of a file.
   createTemplate(html: string) {
-    return new HtmlTemplate(html, this.context);
+    return new HtmlTemplate(() => html, this.context);
   }
 
   createHtmlOutputFromFile(filename: string): HtmlOutput {
     const content = readFileSync(join(this.srcDir, `${filename}.html`), 'utf-8');
-    return new HtmlOutput(content);
+    return new HtmlOutput(content, this.context);
   }
 
   createHtmlOutput(html = ''): HtmlOutput {
-    return new HtmlOutput(html);
+    return new HtmlOutput(html, this.context);
   }
 }
