@@ -13,7 +13,10 @@ The client-side, `Proxy`-based drop-in for `google.script.run`. Only active when
 The interception point where GAS service calls (`CalendarApp`, `SpreadsheetApp`, ...) resolve to either Local mode (fixture lookup) or Live mode (real API pass-through), selected via config.
 
 ## Local mode
-A Service Layer mode that answers GAS service calls from a declared or recorded fixture map instead of calling real Google APIs. Synchronous by nature since it's just a lookup.
+A Service Layer mode that answers GAS service calls from a Declared Fixture instead of calling real Google APIs. Synchronous by nature since it's just a lookup.
+
+## Declared Fixture
+A hand-written, per-project override for a GAS service method's return value, supplied by the consumer (as opposed to any future mechanism that might auto-capture real API responses). Declared in `gas-p.fixtures.ts`, keyed by service name like `devResourceIds`, and read fresh on every request rather than cached — so editing fixtures never requires a dev-server restart, the same guarantee `.gs`/`.js` source edits already get. A fixture's value is either a static return value or a function of the real method's own argument list; either form must be synchronous, since it runs inside the same synchronous `vm.Context` as GAS source itself.
 
 ## Live mode
 A Service Layer mode that translates GAS service calls to real Google API calls via `googleapis`, bridged synchronously via a subprocess (see Sync-Over-Async Bridge). Every call — read or write — is an immediate, live round-trip; there is no cross-call caching or write batching in core. (Sheets is the one service permitted its own internal batching to mirror real Apps Script's auto-flush behavior — see `SpreadsheetApp.flush()` parity note.)

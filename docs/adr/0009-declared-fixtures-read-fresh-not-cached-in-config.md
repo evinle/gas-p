@@ -1,0 +1,7 @@
+# Declared Fixtures live in their own freshly-read file, not gas-p.config.ts
+
+Local mode's Declared Fixtures (`gas-p.fixtures.ts`) are read fresh on every request, the same way `.gs`/`.js` source files already are — not resolved once at dev-server startup the way the rest of `gas-p.config.ts` (`srcDir`, `entry`, `devResourceIds`, ...) is.
+
+We considered just adding a `fixtures` field to the existing `GasPConfig`/`ServiceOptions` object, since that's where every other piece of consumer config already lives, and it would have been the simpler change. But `vitePlugin.ts`'s `configureServer` explicitly loads `gas-p.config.ts` once at server start (by design — it's static, resolved-once-at-startup input). Per ADR 0004, gas-p deliberately made `.gs`/`.js` edits show up on the very next request with no dev-server restart or browser reload needed for RPC-only changes. Fixtures are meant for active local debugging — a consumer tweaking a fixture's return value to explore a code path shouldn't need to restart the dev server to see the new value, any more than editing a `.gs` file does. Caching fixtures inside the once-loaded config object would silently reintroduce the exact restart friction ADR 0004 was written to avoid, just for a different kind of file.
+
+So Declared Fixtures get their own load path, mirroring source-file loading rather than config loading: read from disk on every `buildContext`/`buildBundledContext` call.
