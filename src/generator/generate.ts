@@ -1,7 +1,8 @@
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { runGenerator } from './runGenerator.js';
+import { planShimScaffolds } from './planShimScaffolds.js';
 import { stubTargets } from './stubTargets.js';
 
 const OUTPUT_DIR = join(fileURLToPath(new URL('../', import.meta.url)), 'shims/generated');
@@ -28,6 +29,21 @@ for (const [outputName, source] of generated) {
   } else {
     writeFileSync(outputPath, source);
     console.log(`Wrote ${outputPath}`);
+  }
+}
+
+// Scaffolds the hand-written shim file for a brand-new service (one with an
+// existingShimFile path in stubTargets.ts that doesn't exist on disk yet).
+// Never overwrites one that already exists — planShimScaffolds already
+// excludes those.
+for (const [shimPath, source] of planShimScaffolds(stubTargets, readShimSource)) {
+  if (checkMode) {
+    stale = true;
+    console.error(`Missing shim file: ${shimPath}`);
+  } else {
+    mkdirSync(dirname(shimPath), { recursive: true });
+    writeFileSync(shimPath, source);
+    console.log(`Wrote ${shimPath}`);
   }
 }
 

@@ -62,3 +62,25 @@ Every method on the real `@types/google-apps-script` surface exists somewhere in
 4. **Write a test.** Follow the existing fixture-file convention (see [Testing](#testing) above): add a case to the matching `src/__tests__/<Service>.test.ts` that exercises the method through the public shim interface, not the generator internals.
 
 The generator itself lives in `src/generator/` (`methodSurface.ts` reads the real `.d.ts` interfaces, `implementedMethods.ts` detects what's already real by finding the matching class declaration, `stubSource.ts` renders the abstract stub class, `runGenerator.ts` wires them together per `stubTargets.ts`). You shouldn't need to touch it unless you're adding a new service to the generated surface — see `stubTargets.ts` for how existing services are configured (just `typesFile`/`qualifiedInterfaceName`/`outputName`/`existingShimFile`, no per-target overrides needed).
+
+## Adding a whole new service
+
+`gas-p` implements only a subset of GAS's global services (`CalendarApp`, `Utilities`, ...) — `@types/google-apps-script` declares many more with no shim at all yet (`SpreadsheetApp`, `DriveApp`, `GmailApp`, `FormApp`, ...; see the `google-apps-script.*.d.ts` files for the full list of `declare var X: ...` entry points). This is different from [Filling in a stub](#filling-in-a-stub) above, which covers a method on a service that's already at least partially shimmed.
+
+1. **Add an entry to `stubTargets.ts`.** Find the service's `.d.ts` file and its qualified interface name (e.g. `GoogleAppsScript.Spreadsheet.SpreadsheetApp`), and add a target with an `existingShimFile` pointing at where its hand-written shim should live (e.g. `shims/SpreadsheetApp.ts`) — that file doesn't need to exist yet.
+2. **Run `npm run generate:stubs`.** Because the target's `existingShimFile` doesn't exist on disk, the generator scaffolds *both* files for you: the generated abstract stub class (`src/shims/generated/SpreadsheetApp.stubs.ts`), and the hand-written shim itself (`src/shims/SpreadsheetApp.ts`), pre-wired as a ready-to-use singleton:
+
+   ```ts
+   import { SpreadsheetAppStubs } from './generated/SpreadsheetApp.stubs.js';
+
+   class SpreadsheetApp extends SpreadsheetAppStubs {}
+
+   const instance = new SpreadsheetApp();
+   export { instance as SpreadsheetApp };
+   ```
+
+   Every method on it throws `GasPNotImplementedError` until filled in per [Filling in a stub](#filling-in-a-stub). The generator never overwrites this file once it exists — re-running `generate:stubs` after this point behaves exactly as it does for any other service.
+
+   If the service needs config only known at harness startup (credentials, `srcDir`, ...) rather than a bare singleton, change the shim to export the class itself instead — see the config patterns under [Filling in a stub](#filling-in-a-stub) step 2.
+3. **Wire it into the runtime sandbox.** Import the shim in `src/core/context.ts` and assign it onto `sandbox` inside `createSandbox`, so `.gs`/`.js` source can actually reach it as a global. Follow the existing pattern for services that touch real Google resources: gate construction behind `services` and (if the service can mutate/read a specific resource by ID) thread through `services.devResourceIds`, the same way `CalendarApp` is gated — see [ADR 0001](docs/adr/0001-immediate-live-semantics-no-write-queue.md) for why resource-touching services need this.
+4. **Write a test.** Same convention as step 4 of [Filling in a stub](#filling-in-a-stub).
