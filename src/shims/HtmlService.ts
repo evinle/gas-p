@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { HtmlServiceStubs } from './generated/HtmlService.stubs.js';
 import { HtmlOutputStubs } from './generated/HtmlOutput.stubs.js';
 import { HtmlTemplateStubs } from './generated/HtmlTemplate.stubs.js';
+import { Blob } from './Blob.js';
 
 export function isHtmlOutput(x: unknown): x is HtmlOutput {
   if (typeof x !== 'object' || x === null) return false;
@@ -161,6 +162,20 @@ export class HtmlOutput extends HtmlOutputStubs {
   // made via append()/setContent()/etc. after asTemplate() are reflected.
   asTemplate(): HtmlTemplate {
     return new HtmlTemplate(() => this.content, this.context);
+  }
+
+  // "Return the data inside this object as a blob." — HtmlOutput docs.
+  // text/html matches the object's native format.
+  getBlob(): Blob {
+    return new Blob(this.content, { contentType: 'text/html' });
+  }
+
+  // "Return the data inside this object as a blob converted to the
+  // specified content type." — HtmlOutput docs. Real format conversion
+  // isn't implementable locally, so this tags the same content with the
+  // requested content type rather than converting it.
+  getAs(contentType: string): Blob {
+    return new Blob(this.content, { contentType });
   }
 }
 

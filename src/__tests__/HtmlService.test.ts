@@ -144,6 +144,23 @@ describe('HtmlOutput.asTemplate()', () => {
   });
 });
 
+describe('HtmlOutput.getBlob() and getAs()', () => {
+  it('getBlob() wraps the content in a Blob with text/html content type', () => {
+    const sandbox = buildContext(FIXTURE);
+    const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
+    const blob = output.getBlob();
+    expect(blob.getDataAsString()).toBe('<p>hi</p>');
+    expect(blob.getContentType()).toBe('text/html');
+  });
+
+  it('getAs(contentType) wraps the content in a Blob with the requested content type', () => {
+    const sandbox = buildContext(FIXTURE);
+    const output = sandbox.HtmlService.createHtmlOutput('<p>hi</p>');
+    const blob = output.getAs('application/octet-stream');
+    expect(blob.getContentType()).toBe('application/octet-stream');
+  });
+});
+
 describe('HtmlService.createTemplate()', () => {
   it('evaluates scriptlets in a literal string the same way createTemplateFromFile does for a file', () => {
     const sandbox = buildContext(FIXTURE);
