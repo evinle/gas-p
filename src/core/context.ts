@@ -36,6 +36,7 @@ import { Charts } from '../shims/Charts.js';
 import { Maps } from '../shims/Maps.js';
 import { LinearOptimizationService } from '../shims/LinearOptimizationService.js';
 import { applyFixtures, loadFixtures } from './fixtures.js';
+import type { GoogleCredentials } from './credentials.js';
 
 // Already-instantiated singletons with no per-request construction — safe to
 // assign onto every sandbox unconditionally. Real implementations (Utilities,
@@ -110,21 +111,19 @@ const CONFIGURED_SERVICES: ConfiguredService[] = [
   {
     name: 'CalendarApp',
     fixtureEligible: true,
-    // credentialsPath/clientSecretPath may be undefined here — CalendarApp
-    // itself only demands them lazily, at the point a real call actually
-    // needs to fall through to a real Google API request with no fixture.
-    create: ({ services }) => new CalendarApp(services?.credentialsPath, services?.clientSecretPath, services?.devResourceIds),
+    // services may be undefined here — CalendarApp itself only demands
+    // credentials lazily, at the point a real call actually needs to fall
+    // through to a real Google API request with no fixture.
+    create: ({ services }) => new CalendarApp(services, services?.devResourceIds),
   },
   {
     name: 'Session',
     fixtureEligible: true,
-    create: ({ srcDir, services }) => new Session(services?.credentialsPath, services?.clientSecretPath, srcDir),
+    create: ({ srcDir, services }) => new Session(services, srcDir),
   },
 ];
 
-export interface ServiceOptions {
-  credentialsPath: string;
-  clientSecretPath: string;
+export interface ServiceOptions extends GoogleCredentials {
   devResourceIds?: Record<string, string[]>;
 }
 

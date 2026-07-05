@@ -1,22 +1,11 @@
 import { assertResourceAllowed } from '../core/allowlist.js';
 import { runGoogleApiCall } from '../core/googleApiCall.js';
+import { requireCredentials, type GoogleCredentials } from '../core/credentials.js';
 import { CalendarAppStubs } from './generated/CalendarApp.stubs.js';
 import { CalendarStubs } from './generated/Calendar.stubs.js';
 import { CalendarEventStubs } from './generated/CalendarEvent.stubs.js';
-import { GasPMissingCredentialsError } from '../errors.js';
 
 const SERVICE = 'CalendarApp';
-
-function requireCredentials(
-  method: string,
-  credentialsPath: string | undefined,
-  clientSecretPath: string | undefined
-): [string, string] {
-  if (!credentialsPath || !clientSecretPath) {
-    throw new GasPMissingCredentialsError(SERVICE, method);
-  }
-  return [credentialsPath, clientSecretPath];
-}
 
 interface RawEvent {
   id: string;
@@ -61,15 +50,14 @@ class Calendar extends CalendarStubs {
 
   constructor(
     private calendarId: string,
-    private credentialsPath: string | undefined,
-    private clientSecretPath: string | undefined
+    private credentials: GoogleCredentials | undefined
   ) {
     super();
   }
 
   getEvents(startTime: Date, endTime: Date) {
     if (!this.eventsCache) {
-      const [credentialsPath, clientSecretPath] = requireCredentials('getEvents', this.credentialsPath, this.clientSecretPath);
+      const { credentialsPath, clientSecretPath } = requireCredentials(SERVICE, 'getEvents', this.credentials);
       const { items } = runGoogleApiCall(credentialsPath, clientSecretPath, {
         service: 'calendar',
         version: 'v3',
@@ -90,7 +78,7 @@ class Calendar extends CalendarStubs {
   }
 
   createEvent(title: string, startTime: Date, endTime: Date) {
-    const [credentialsPath, clientSecretPath] = requireCredentials('createEvent', this.credentialsPath, this.clientSecretPath);
+    const { credentialsPath, clientSecretPath } = requireCredentials(SERVICE, 'createEvent', this.credentials);
     const raw = runGoogleApiCall(credentialsPath, clientSecretPath, {
       service: 'calendar',
       version: 'v3',
@@ -112,8 +100,7 @@ class Calendar extends CalendarStubs {
 
 export class CalendarApp extends CalendarAppStubs {
   constructor(
-    private credentialsPath: string | undefined,
-    private clientSecretPath: string | undefined,
+    private credentials: GoogleCredentials | undefined,
     private devResourceIds: Record<string, string[]> | undefined
   ) {
     super();
@@ -121,11 +108,11 @@ export class CalendarApp extends CalendarAppStubs {
 
   getCalendarById(id: string) {
     assertResourceAllowed(this.devResourceIds, SERVICE, id);
-    return new Calendar(id, this.credentialsPath, this.clientSecretPath);
+    return new Calendar(id, this.credentials);
   }
 
   getDefaultCalendar() {
     assertResourceAllowed(this.devResourceIds, SERVICE, 'primary');
-    return new Calendar('primary', this.credentialsPath, this.clientSecretPath);
+    return new Calendar('primary', this.credentials);
   }
 }
