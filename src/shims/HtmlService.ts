@@ -60,6 +60,11 @@ class HtmlTemplate extends HtmlTemplateStubs {
   evaluate(): HtmlOutput {
     return new HtmlOutput(evaluateTemplate(this.raw, this.context));
   }
+
+  // "Returns the unprocessed content of this template." — HtmlTemplate docs.
+  getRawContent(): string {
+    return this.raw;
+  }
 }
 
 // createTemplateFromFile's evaluate() needs a live reference to the sandbox's
@@ -76,6 +81,13 @@ export class HtmlService extends HtmlServiceStubs {
   createTemplateFromFile(filename: string) {
     const raw = readFileSync(join(this.srcDir, `${filename}.html`), 'utf-8');
     return new HtmlTemplate(raw, this.context);
+  }
+
+  // "Creates a new HtmlTemplate object that can be returned from the
+  // script." — HtmlService docs. Same scriptlet evaluation as
+  // createTemplateFromFile, just from a literal string instead of a file.
+  createTemplate(html: string) {
+    return new HtmlTemplate(html, this.context);
   }
 
   createHtmlOutputFromFile(filename: string): HtmlOutput {

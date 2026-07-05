@@ -44,6 +44,8 @@ Every method on the real `@types/google-apps-script` surface exists somewhere in
      return Buffer.from(this.bytes).toString('utf-8');
    }
    ```
+
+   If the official reference doesn't specify the behavior you need either (defaults it's silent on, or an internal representation it only describes vaguely — e.g. `HtmlTemplate.getCode()`'s generated-JS format), don't guess. Escalate to checking against a real Apps Script execution instead: write a small script exercising the method, run it in the Apps Script editor, and log the result. If even that can't establish behavior stable and precise enough to implement with confidence (undocumented formatting with no specified grammar, apparent bugs you'd have to replicate rather than fix, single-sample results you can't generalize from), it's fine to leave the method as a stub — just document *why* in an ADR (see [`docs/adr/0005-htmltemplate-getcode-left-unimplemented.md`](docs/adr/0005-htmltemplate-getcode-left-unimplemented.md) for a worked example) rather than shipping a plausible-looking guess nobody can verify.
 3. **Replace it with a real implementation.** The hand-written shim module for that service (e.g. `src/shims/CacheService.ts`) declares a class of the *exact same name* as the interface, `extend`ing the generated abstract stub class, and overrides individual methods as real class methods:
 
    ```ts

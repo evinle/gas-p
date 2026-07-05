@@ -59,9 +59,18 @@ describe('HtmlOutput unimplemented methods', () => {
   });
 });
 
-describe('HtmlService unimplemented methods', () => {
-  it('createTemplate throws GasPNotImplementedError', () => {
+describe('HtmlService.createTemplate()', () => {
+  it('evaluates scriptlets in a literal string the same way createTemplateFromFile does for a file', () => {
     const sandbox = buildContext(FIXTURE);
-    expect(() => sandbox.HtmlService.createTemplate('<p>hi</p>')).toThrow(GasPNotImplementedError);
+    const output = sandbox.HtmlService.createTemplate('<p>2 + 2 = <?= 2 + 2 ?></p>').evaluate();
+    expect(output.getContent()).toBe('<p>2 + 2 = 4</p>');
+  });
+});
+
+describe('HtmlTemplate.getRawContent()', () => {
+  it('returns the original, unprocessed template string, scriptlets and all', () => {
+    const sandbox = buildContext(FIXTURE);
+    const template = sandbox.HtmlService.createTemplate('<p>2 + 2 = <?= 2 + 2 ?></p>');
+    expect(template.getRawContent()).toBe('<p>2 + 2 = <?= 2 + 2 ?></p>');
   });
 });

@@ -7,7 +7,4 @@ export abstract class HtmlTemplateStubs {
   getCodeWithComments(...args: unknown[]): never {
     throw new GasPNotImplementedError('HtmlTemplate', 'getCodeWithComments');
   }
-  getRawContent(...args: unknown[]): never {
-    throw new GasPNotImplementedError('HtmlTemplate', 'getRawContent');
-  }
 }
