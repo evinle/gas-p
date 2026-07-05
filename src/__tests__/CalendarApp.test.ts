@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { execFileSync } from 'child_process';
+import { GasPMissingCredentialsError } from '../errors.js';
 
 vi.mock('child_process', () => ({
   execFileSync: vi.fn(),
@@ -107,6 +108,27 @@ describe('CalendarApp.getDefaultCalendar()', () => {
     const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
     const CalendarApp = new CalendarAppClass('/fake/credentials.json', '/fake/client_secret.json', { CalendarApp: ['cal123'] });
     expect(() => CalendarApp.getDefaultCalendar()).toThrow(/primary/);
+    expect(mockExecFileSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('CalendarApp construction without credentials', () => {
+  it('constructs successfully with credentialsPath/clientSecretPath undefined', async () => {
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    expect(() => new CalendarAppClass(undefined, undefined, ALLOWLIST)).not.toThrow();
+  });
+
+  it('getCalendarById()/getDefaultCalendar() keep working, still gated by devResourceIds', async () => {
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass(undefined, undefined, ALLOWLIST);
+    expect(typeof CalendarApp.getCalendarById('cal123').getEvents).toBe('function');
+    expect(() => CalendarApp.getCalendarById('not-allowlisted')).toThrow(/not-allowlisted/);
+  });
+
+  it('Calendar.getEvents() throws GasPMissingCredentialsError, not a raw crash, with no credentials configured', async () => {
+    const { CalendarApp: CalendarAppClass } = await import('../shims/CalendarApp.js');
+    const CalendarApp = new CalendarAppClass(undefined, undefined, ALLOWLIST);
+    expect(() => CalendarApp.getCalendarById('cal123').getEvents(START, END)).toThrow(GasPMissingCredentialsError);
     expect(mockExecFileSync).not.toHaveBeenCalled();
   });
 });

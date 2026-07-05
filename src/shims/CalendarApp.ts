@@ -3,8 +3,20 @@ import { runGoogleApiCall } from '../core/googleApiCall.js';
 import { CalendarAppStubs } from './generated/CalendarApp.stubs.js';
 import { CalendarStubs } from './generated/Calendar.stubs.js';
 import { CalendarEventStubs } from './generated/CalendarEvent.stubs.js';
+import { GasPMissingCredentialsError } from '../errors.js';
 
 const SERVICE = 'CalendarApp';
+
+function requireCredentials(
+  method: string,
+  credentialsPath: string | undefined,
+  clientSecretPath: string | undefined
+): [string, string] {
+  if (!credentialsPath || !clientSecretPath) {
+    throw new GasPMissingCredentialsError(SERVICE, method);
+  }
+  return [credentialsPath, clientSecretPath];
+}
 
 interface RawEvent {
   id: string;
@@ -49,15 +61,16 @@ class Calendar extends CalendarStubs {
 
   constructor(
     private calendarId: string,
-    private credentialsPath: string,
-    private clientSecretPath: string
+    private credentialsPath: string | undefined,
+    private clientSecretPath: string | undefined
   ) {
     super();
   }
 
   getEvents(startTime: Date, endTime: Date) {
     if (!this.eventsCache) {
-      const { items } = runGoogleApiCall(this.credentialsPath, this.clientSecretPath, {
+      const [credentialsPath, clientSecretPath] = requireCredentials('getEvents', this.credentialsPath, this.clientSecretPath);
+      const { items } = runGoogleApiCall(credentialsPath, clientSecretPath, {
         service: 'calendar',
         version: 'v3',
         resource: 'events',
@@ -77,7 +90,8 @@ class Calendar extends CalendarStubs {
   }
 
   createEvent(title: string, startTime: Date, endTime: Date) {
-    const raw = runGoogleApiCall(this.credentialsPath, this.clientSecretPath, {
+    const [credentialsPath, clientSecretPath] = requireCredentials('createEvent', this.credentialsPath, this.clientSecretPath);
+    const raw = runGoogleApiCall(credentialsPath, clientSecretPath, {
       service: 'calendar',
       version: 'v3',
       resource: 'events',
@@ -98,8 +112,8 @@ class Calendar extends CalendarStubs {
 
 export class CalendarApp extends CalendarAppStubs {
   constructor(
-    private credentialsPath: string,
-    private clientSecretPath: string,
+    private credentialsPath: string | undefined,
+    private clientSecretPath: string | undefined,
     private devResourceIds: Record<string, string[]> | undefined
   ) {
     super();

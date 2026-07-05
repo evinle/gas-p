@@ -21,14 +21,19 @@ import type { ContentService } from '../shims/ContentService.js';
 import type { Charts } from '../shims/Charts.js';
 import type { Maps } from '../shims/Maps.js';
 import type { LinearOptimizationService } from '../shims/LinearOptimizationService.js';
+import type { CalendarApp } from '../shims/CalendarApp.js';
+import type { Session } from '../shims/Session.js';
 
 // The STATIC_SERVICES entries eligible for Declared Fixtures (context.ts's
 // FIXTURE_EXCLUDED_STATIC_SERVICES excludes Utilities/CacheService/
-// UrlFetchApp/Logger). Kept in sync with that list by hand — this is a type
-// import for name/method-checking gas-p.fixtures.ts only, not a runtime
+// UrlFetchApp/Logger), plus CalendarApp/Session (fixtureEligible in
+// CONFIGURED_SERVICES). Kept in sync with those lists by hand — this is a
+// type import for name/method-checking gas-p.fixtures.ts only, not a runtime
 // source of truth.
 interface EligibleServiceInstances {
   SpreadsheetApp: typeof SpreadsheetApp;
+  CalendarApp: InstanceType<typeof CalendarApp>;
+  Session: InstanceType<typeof Session>;
   FormApp: typeof FormApp;
   GmailApp: typeof GmailApp;
   DriveApp: typeof DriveApp;

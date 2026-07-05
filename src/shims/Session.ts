@@ -4,6 +4,9 @@ import { runInSubprocess } from '../core/subprocessBridge.js';
 import { buildGoogleAuthPreamble } from '../core/googleAuthScript.js';
 import { SessionStubs } from './generated/Session.stubs.js';
 import { UserStubs } from './generated/User.stubs.js';
+import { GasPMissingCredentialsError } from '../errors.js';
+
+const SERVICE = 'Session';
 
 interface Manifest {
   timeZone: string;
@@ -64,8 +67,8 @@ class User extends UserStubs {
 
 export class Session extends SessionStubs {
   constructor(
-    private credentialsPath: string,
-    private clientSecretPath: string,
+    private credentialsPath: string | undefined,
+    private clientSecretPath: string | undefined,
     private srcDir: string
   ) {
     super();
@@ -76,6 +79,9 @@ export class Session extends SessionStubs {
   }
 
   getActiveUser() {
+    if (!this.credentialsPath || !this.clientSecretPath) {
+      throw new GasPMissingCredentialsError(SERVICE, 'getActiveUser');
+    }
     return new User(fetchActiveUserEmail(this.credentialsPath, this.clientSecretPath));
   }
 }

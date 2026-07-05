@@ -1,10 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
+import { execFileSync } from 'child_process';
 import { buildContext, buildBundledContext } from '../core/context.js';
-import { GasPNotImplementedError } from '../errors.js';
+import { GasPNotImplementedError, GasPMissingCredentialsError } from '../errors.js';
+
+vi.mock('child_process', () => ({
+  execFileSync: vi.fn(),
+}));
+
+const mockExecFileSync = vi.mocked(execFileSync);
+
+beforeEach(() => { vi.resetAllMocks(); });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, '__fixtures__', 'harness');
@@ -139,6 +148,76 @@ describe('buildContext', () => {
       } finally {
         rmSync(scratchDir, { recursive: true, force: true });
       }
+    });
+
+    it('exposes CalendarApp/Session as sandbox globals with no services option at all', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const sandbox = await buildContext({ srcDir: dir });
+      expect(typeof sandbox.CalendarApp.getCalendarById).toBe('function');
+      expect(typeof sandbox.Session.getActiveUser).toBe('function');
+    });
+
+    it('answers a CalendarApp stub-only method call from a fixture with no credentials configured', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-fixtures-'));
+      const fixturesFile = join(scratchDir, 'gas-p.fixtures.ts');
+      try {
+        writeFileSync(fixturesFile, "export default { CalendarApp: { getEventById: (id) => ({ id }) } };");
+        const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+        expect(sandbox.CalendarApp.getEventById('evt1')).toEqual({ id: 'evt1' });
+      } finally {
+        rmSync(scratchDir, { recursive: true, force: true });
+      }
+    });
+
+    it('Session.getActiveUser() throws GasPMissingCredentialsError with no fixture and no credentials', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const sandbox = await buildContext({ srcDir: dir });
+      expect(() => sandbox.Session.getActiveUser()).toThrow(GasPMissingCredentialsError);
+    });
+
+    it('Session.getActiveUser() returns the fixture value when no credentials are configured', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-fixtures-'));
+      const fixturesFile = join(scratchDir, 'gas-p.fixtures.ts');
+      try {
+        writeFileSync(fixturesFile, "export default { Session: { getActiveUser: 'fixture-user' } };");
+        const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+        expect(sandbox.Session.getActiveUser()).toBe('fixture-user');
+      } finally {
+        rmSync(scratchDir, { recursive: true, force: true });
+      }
+    });
+
+    it('Session.getActiveUser() prefers the fixture over real credentials when both are available', async () => {
+      const dir = join(SESSION_FIXTURES, 'basic');
+      const scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-fixtures-'));
+      const fixturesFile = join(scratchDir, 'gas-p.fixtures.ts');
+      try {
+        writeFileSync(fixturesFile, "export default { Session: { getActiveUser: 'fixture-user' } };");
+        const sandbox = await buildContext({
+          srcDir: dir,
+          fixturesFile,
+          services: { credentialsPath: '/fake/credentials.json', clientSecretPath: '/fake/client_secret.json' },
+        });
+        expect(sandbox.Session.getActiveUser()).toBe('fixture-user');
+        expect(mockExecFileSync).not.toHaveBeenCalled();
+      } finally {
+        rmSync(scratchDir, { recursive: true, force: true });
+      }
+    });
+
+    it('Session.getScriptTimeZone() is unaffected, with or without credentials configured', async () => {
+      const dir = join(SESSION_FIXTURES, 'basic');
+      const sandbox = await buildContext({ srcDir: dir });
+      expect(sandbox.Session.getScriptTimeZone()).toBe('America/New_York');
+    });
+
+    it('CalendarApp.getCalendarById()/getDefaultCalendar() are unaffected, still gated by devResourceIds, with no credentials configured', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const sandbox = await buildContext({ srcDir: dir });
+      expect(() => sandbox.CalendarApp.getCalendarById('not-allowlisted')).toThrow(/not-allowlisted/);
+      expect(() => sandbox.CalendarApp.getDefaultCalendar()).toThrow(/primary/);
     });
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
-import { GasPNotImplementedError } from '../errors.js';
+import { GasPNotImplementedError, GasPMissingCredentialsError } from '../errors.js';
 
 vi.mock('child_process', () => ({
   execFileSync: vi.fn(),
@@ -29,6 +29,26 @@ describe('Session.getActiveUser().getEmail()', () => {
     const { Session: SessionClass } = await import('../shims/Session.js');
     const session = new SessionClass('/fake/credentials.json', '/fake/client_secret.json', FIXTURE_SRC_DIR);
     expect(session.getActiveUser().getEmail()).toBe('dev@example.com');
+  });
+});
+
+describe('Session construction without credentials', () => {
+  it('constructs successfully with credentialsPath/clientSecretPath undefined', async () => {
+    const { Session: SessionClass } = await import('../shims/Session.js');
+    expect(() => new SessionClass(undefined, undefined, FIXTURE_SRC_DIR)).not.toThrow();
+  });
+
+  it('getScriptTimeZone() keeps working with no credentials configured', async () => {
+    const { Session: SessionClass } = await import('../shims/Session.js');
+    const session = new SessionClass(undefined, undefined, FIXTURE_SRC_DIR);
+    expect(session.getScriptTimeZone()).toBe('America/New_York');
+  });
+
+  it('getActiveUser() throws GasPMissingCredentialsError, not GasPNotImplementedError or a raw crash', async () => {
+    const { Session: SessionClass } = await import('../shims/Session.js');
+    const session = new SessionClass(undefined, undefined, FIXTURE_SRC_DIR);
+    expect(() => session.getActiveUser()).toThrow(GasPMissingCredentialsError);
+    expect(mockExecFileSync).not.toHaveBeenCalled();
   });
 });
 

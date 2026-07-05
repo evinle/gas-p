@@ -88,39 +88,37 @@ interface SandboxBuildParams {
 
 interface ConfiguredService {
   name: string;
-  // Whether this service needs credentials (services option) to construct —
-  // CalendarApp/Session touch real Google APIs and are only reachable when
-  // the harness was given credentials to do so.
-  requiresServices: boolean;
+  // Whether Declared Fixtures apply to this service — CalendarApp/Session
+  // are Google-API-backed and credential-requiring, so they're fixture-
+  // eligible like the stub-only STATIC_SERVICES; HtmlService/PropertiesService
+  // are fully-local/real and excluded, same as Utilities/CacheService/etc.
+  fixtureEligible: boolean;
   create(params: SandboxBuildParams): unknown;
 }
 
 const CONFIGURED_SERVICES: ConfiguredService[] = [
   {
     name: 'HtmlService',
-    requiresServices: false,
+    fixtureEligible: false,
     create: ({ srcDir, htmlDir, sandbox, userAgent }) => new HtmlService(htmlDir ?? srcDir, sandbox, userAgent),
   },
   {
     name: 'PropertiesService',
-    requiresServices: false,
+    fixtureEligible: false,
     create: ({ srcDir }) => new PropertiesService(srcDir),
   },
   {
     name: 'CalendarApp',
-    requiresServices: true,
-    create: ({ services }) => {
-      if (!services) throw new Error('CalendarApp requires services to be configured');
-      return new CalendarApp(services.credentialsPath, services.clientSecretPath, services.devResourceIds);
-    },
+    fixtureEligible: true,
+    // credentialsPath/clientSecretPath may be undefined here — CalendarApp
+    // itself only demands them lazily, at the point a real call actually
+    // needs to fall through to a real Google API request with no fixture.
+    create: ({ services }) => new CalendarApp(services?.credentialsPath, services?.clientSecretPath, services?.devResourceIds),
   },
   {
     name: 'Session',
-    requiresServices: true,
-    create: ({ srcDir, services }) => {
-      if (!services) throw new Error('Session requires services to be configured');
-      return new Session(services.credentialsPath, services.clientSecretPath, srcDir);
-    },
+    fixtureEligible: true,
+    create: ({ srcDir, services }) => new Session(services?.credentialsPath, services?.clientSecretPath, srcDir),
   },
 ];
 
@@ -168,7 +166,6 @@ async function createSandbox(config: BuildContextConfig, userAgent?: string): Pr
     userAgent,
   };
   for (const configured of CONFIGURED_SERVICES) {
-    if (configured.requiresServices && !config.services) continue;
     sandbox[configured.name] = configured.create(params);
   }
 
@@ -176,6 +173,10 @@ async function createSandbox(config: BuildContextConfig, userAgent?: string): Pr
   for (const name of Object.keys(STATIC_SERVICES)) {
     if (FIXTURE_EXCLUDED_STATIC_SERVICES.has(name)) continue;
     sandbox[name] = applyFixtures(name, sandbox[name] as object, fixtures);
+  }
+  for (const configured of CONFIGURED_SERVICES) {
+    if (!configured.fixtureEligible) continue;
+    sandbox[configured.name] = applyFixtures(configured.name, sandbox[configured.name] as object, fixtures);
   }
 
   return sandbox;
