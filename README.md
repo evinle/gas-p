@@ -30,6 +30,7 @@ export default defineConfig({
     gasPVitePlugin({
       srcDir,
       entry: "Code.ts", // omit if your source is plain .gs/.js, no bundling needed
+      htmlDir: "client", // omit if your .html files live alongside srcDir
       devResourceIds: {
         // Live mode refuses to touch any resource ID not declared here —
         // a copy-pasted production calendar/spreadsheet ID can't get
