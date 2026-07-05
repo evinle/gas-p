@@ -26,6 +26,8 @@ npm test
 
 No type assertions (`as SomeType`). Write explicit guard functions that check both key existence and value type (`'key' in x && typeof x.key === 'string'`) — TypeScript narrows correctly after that, without a cast.
 
+Weigh every parameter added to a function signature — each one is a coupling point every call site has to get right, in order, forever. Once a signature reaches 3 parameters, that's a signal to consider grouping the related ones into a single object/interface that names the concept (e.g. `SandboxBuildParams` in `context.ts`), rather than continuing to add positional params. This isn't a hard cutoff — three same-typed, order-sensitive params (`(srcDir, htmlDir, sandbox)`) is worse than three self-evident ones, and a well-named object of two params can already be worth it. Optimize for what a call site reads like, not the count.
+
 ## Reporting a missing method or a bug
 
 `gas-p` implements GAS global services (`CalendarApp`, `UrlFetchApp`, ...) incrementally — an unimplemented method throws `GasPNotImplementedError`. Use the **Missing method / feature request** issue template to ask for one, or **Bug report** if something behaves differently than real Apps Script.
