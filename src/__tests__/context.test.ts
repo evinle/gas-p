@@ -1,12 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { buildContext, buildBundledContext } from '../core/context.js';
+import { GasPNotImplementedError } from '../errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, '__fixtures__', 'harness');
 const CONTEXT_FIXTURES = join(__dirname, '__fixtures__', 'context');
 const SESSION_FIXTURES = join(__dirname, '__fixtures__', 'session');
+const FIXTURES_FIXTURES = join(__dirname, '__fixtures__', 'fixtures');
 
 describe('buildContext', () => {
   it('throws a clear error when srcDir has no .gs/.js source files', async () => {
@@ -85,6 +89,58 @@ describe('buildContext', () => {
     const sandbox = await buildContext({ srcDir: dir }, 'ExampleBrowser/1.0');
     expect(sandbox.HtmlService.getUserAgent()).toBe('ExampleBrowser/1.0');
   });
+
+  describe('Declared Fixtures', () => {
+    it('answers a stub-only method call from gas-p.fixtures.ts instead of throwing GasPNotImplementedError', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const fixturesFile = join(FIXTURES_FIXTURES, 'basic', 'gas-p.fixtures.ts');
+      const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+      expect(sandbox.SpreadsheetApp.someUnimplementedMethod()).toBe('a static value');
+    });
+
+    it('leaves a stub-only method with no matching fixture throwing GasPNotImplementedError, unchanged', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const fixturesFile = join(FIXTURES_FIXTURES, 'basic', 'gas-p.fixtures.ts');
+      const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+      expect(() => sandbox.SpreadsheetApp.getActiveSpreadsheet()).toThrow(GasPNotImplementedError);
+    });
+
+    it('behaves exactly as today when no fixturesFile is given', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const sandbox = await buildContext({ srcDir: dir });
+      expect(() => sandbox.SpreadsheetApp.getActiveSpreadsheet()).toThrow(GasPNotImplementedError);
+    });
+
+    it('ignores a fixture mistakenly declared for a fully-local/real service (Utilities)', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-fixtures-'));
+      const fixturesFile = join(scratchDir, 'gas-p.fixtures.ts');
+      try {
+        writeFileSync(fixturesFile, "export default { Utilities: { base64Decode: 'should not apply' } };");
+        const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+        expect(sandbox.Utilities.base64Decode('aGVsbG8=')).toEqual(Array.from(Buffer.from('hello')));
+      } finally {
+        rmSync(scratchDir, { recursive: true, force: true });
+      }
+    });
+
+    it('reads gas-p.fixtures.ts fresh on every buildContext call — editing it between calls changes the next answer', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-fixtures-'));
+      const fixturesFile = join(scratchDir, 'gas-p.fixtures.ts');
+      try {
+        writeFileSync(fixturesFile, "export default { SpreadsheetApp: { someUnimplementedMethod: 'first' } };");
+        const first = await buildContext({ srcDir: dir, fixturesFile });
+        expect(first.SpreadsheetApp.someUnimplementedMethod()).toBe('first');
+
+        writeFileSync(fixturesFile, "export default { SpreadsheetApp: { someUnimplementedMethod: 'second' } };");
+        const second = await buildContext({ srcDir: dir, fixturesFile });
+        expect(second.SpreadsheetApp.someUnimplementedMethod()).toBe('second');
+      } finally {
+        rmSync(scratchDir, { recursive: true, force: true });
+      }
+    });
+  });
 });
 
 describe('buildBundledContext', () => {
@@ -120,5 +176,12 @@ describe('buildBundledContext', () => {
     expect(sandbox.HtmlService.createHtmlOutputFromFile('index').getContent()).toBe(
       '<p>from the views dir, not the entry dir</p>\n'
     );
+  });
+
+  it('answers a stub-only method call from gas-p.fixtures.ts, same as buildContext', async () => {
+    const dir = join(CONTEXT_FIXTURES, 'multi-file-import');
+    const fixturesFile = join(FIXTURES_FIXTURES, 'basic', 'gas-p.fixtures.ts');
+    const sandbox = await buildBundledContext({ srcDir: dir, entry: 'Code.ts', fixturesFile });
+    expect(sandbox.SpreadsheetApp.someUnimplementedMethod()).toBe('a static value');
   });
 });

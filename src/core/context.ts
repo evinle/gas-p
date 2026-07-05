@@ -35,6 +35,7 @@ import { ContentService } from '../shims/ContentService.js';
 import { Charts } from '../shims/Charts.js';
 import { Maps } from '../shims/Maps.js';
 import { LinearOptimizationService } from '../shims/LinearOptimizationService.js';
+import { applyFixtures, loadFixtures } from './fixtures.js';
 
 // Already-instantiated singletons with no per-request construction — safe to
 // assign onto every sandbox unconditionally. Real implementations (Utilities,
@@ -72,6 +73,10 @@ const STATIC_SERVICES: Record<string, unknown> = {
   Maps,
   LinearOptimizationService,
 };
+
+// Fully-local/real STATIC_SERVICES entries — Declared Fixtures never wrap
+// these, even if a consumer mistakenly declares one, per #38's scope.
+const FIXTURE_EXCLUDED_STATIC_SERVICES = new Set(['Utilities', 'CacheService', 'UrlFetchApp', 'Logger']);
 
 interface SandboxBuildParams {
   srcDir: string;
@@ -139,6 +144,9 @@ export interface BuildContextConfig {
   srcDir: string;
   services?: ServiceOptions;
   htmlDir?: string;
+  // Path to a gas-p.fixtures.ts file, read fresh on every buildContext/
+  // buildBundledContext call (never cached) — see ADR 0009.
+  fixturesFile?: string;
 }
 
 export interface BuildBundledContextConfig extends BuildContextConfig {
@@ -146,7 +154,7 @@ export interface BuildBundledContextConfig extends BuildContextConfig {
   consumerConfig?: ConsumerViteConfig;
 }
 
-function createSandbox(config: BuildContextConfig, userAgent?: string): vm.Context {
+async function createSandbox(config: BuildContextConfig, userAgent?: string): Promise<vm.Context> {
   const sandbox: Record<string, unknown> = {};
   vm.createContext(sandbox);
 
@@ -164,6 +172,12 @@ function createSandbox(config: BuildContextConfig, userAgent?: string): vm.Conte
     sandbox[configured.name] = configured.create(params);
   }
 
+  const fixtures = await loadFixtures(config.fixturesFile);
+  for (const name of Object.keys(STATIC_SERVICES)) {
+    if (FIXTURE_EXCLUDED_STATIC_SERVICES.has(name)) continue;
+    sandbox[name] = applyFixtures(name, sandbox[name] as object, fixtures);
+  }
+
   return sandbox;
 }
 
@@ -172,7 +186,7 @@ function createSandbox(config: BuildContextConfig, userAgent?: string): vm.Conte
 // async (despite synchronous internals today) to match buildBundledContext's
 // shape — Declared Fixtures need a real async TS-transpiling fresh read here.
 export async function buildContext(config: BuildContextConfig, userAgent?: string): Promise<vm.Context> {
-  const sandbox = createSandbox(config, userAgent);
+  const sandbox = await createSandbox(config, userAgent);
 
   const { srcDir } = config;
   const sourceFiles = readdirSync(srcDir).filter((f) => extname(f) === '.gs' || extname(f) === '.js');
@@ -196,7 +210,7 @@ export async function buildContext(config: BuildContextConfig, userAgent?: strin
 // so this dev-time bundle resolves aliases/imports identically to their real
 // `vite build` / `clasp push` artifact instead of a bare, config-less bundle.
 export async function buildBundledContext(config: BuildBundledContextConfig, userAgent?: string): Promise<vm.Context> {
-  const sandbox = createSandbox(config, userAgent);
+  const sandbox = await createSandbox(config, userAgent);
   sandbox.module = { exports: {} };
 
   const { srcDir, entry, consumerConfig } = config;
