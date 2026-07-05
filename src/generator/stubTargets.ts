@@ -48,6 +48,12 @@ export const stubTargets: StubTarget[] = [
     existingShimFile: join(SRC_ROOT, 'shims/Utilities.ts'),
   },
   {
+    typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.base.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Base.Blob',
+    outputName: 'Blob',
+    existingShimFile: join(SRC_ROOT, 'shims/Blob.ts'),
+  },
+  {
     typesFile: resolveTypesFile('@types/google-apps-script/google-apps-script.properties.d.ts'),
     qualifiedInterfaceName: 'GoogleAppsScript.Properties.PropertiesService',
     outputName: 'PropertiesService',

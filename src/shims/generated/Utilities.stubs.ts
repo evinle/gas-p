@@ -37,9 +37,6 @@ export abstract class UtilitiesStubs {
   gzip(...args: unknown[]): never {
     throw new GasPNotImplementedError('Utilities', 'gzip');
   }
-  newBlob(...args: unknown[]): never {
-    throw new GasPNotImplementedError('Utilities', 'newBlob');
-  }
   parseCsv(...args: unknown[]): never {
     throw new GasPNotImplementedError('Utilities', 'parseCsv');
   }
