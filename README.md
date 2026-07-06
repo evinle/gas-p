@@ -1,5 +1,7 @@
 # gas-p
 
+[![npm version](https://img.shields.io/npm/v/@evinle/gas-p.svg)](https://www.npmjs.com/package/@evinle/gas-p)
+
 A local development runtime for Google Apps Script (GAS) web apps. Run your real `.gs`/`.ts` server code and real `index.html` frontend together with `vite dev` — hot reload, real Google API calls, no `clasp push` round-trip to see a change, and no imports/`await`/coupling added to your GAS source; `google.script.run` keeps working exactly as it does in production.
 
 - [How it works](#how-it-works)
