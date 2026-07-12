@@ -370,6 +370,36 @@ describe('buildBundledContext', () => {
       expect(sandbox.getGreeting('World')).toBe('Howdy there, World');
     });
 
+    it('does not reuse the cached bundle when consumerConfig differs, even with the same srcDir+entry', async () => {
+      writeFileSync(
+        join(scratchDir, 'Code.ts'),
+        "import { greetingFor } from '@utils';\nfunction getGreeting(name: string) {\n  return greetingFor(name);\n}\n"
+      );
+      writeFileSync(
+        join(scratchDir, 'UtilsA.ts'),
+        "export function greetingFor(name: string): string {\n  return 'Hello from A, ' + name;\n}\n"
+      );
+      writeFileSync(
+        join(scratchDir, 'UtilsB.ts'),
+        "export function greetingFor(name: string): string {\n  return 'Hello from B, ' + name;\n}\n"
+      );
+
+      const first = await buildBundledContext({
+        srcDir: scratchDir,
+        entry: 'Code.ts',
+        consumerConfig: { resolve: { alias: { '@utils': join(scratchDir, 'UtilsA.ts') } } },
+      });
+      expect(first.getGreeting('World')).toBe('Hello from A, World');
+
+      const second = await buildBundledContext({
+        srcDir: scratchDir,
+        entry: 'Code.ts',
+        consumerConfig: { resolve: { alias: { '@utils': join(scratchDir, 'UtilsB.ts') } } },
+      });
+      expect(mockBuild).toHaveBeenCalledTimes(2); // proves the second call wasn't served from A's cache entry
+      expect(second.getGreeting('World')).toBe('Hello from B, World');
+    });
+
     it('does not leak module-level state between two calls with unchanged, cached source', async () => {
       writeFileSync(
         join(scratchDir, 'Code.ts'),

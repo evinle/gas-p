@@ -202,13 +202,21 @@ export async function buildContext(config: BuildContextConfig, userAgent?: strin
 }
 
 // Caches buildBundledContext's Rollup output across calls with the same
-// srcDir+entry, keyed as a plain string — rebuilding a fresh vm.Context and
-// re-running the (possibly cached) bundle still happens on every call
-// regardless, so per-request execution freshness is untouched by this cache.
-// Invalidated by mtime+size (both come off one stat() call, so checking size
-// is free) of every file Rollup's own module graph says contributed to the
-// bundle — not a hand-maintained file list, so added/removed imports are
-// picked up the moment they change what's in that graph.
+// srcDir+entry+consumerConfig — rebuilding a fresh vm.Context and re-running
+// the (possibly cached) bundle still happens on every call regardless, so
+// per-request execution freshness is untouched by this cache. Invalidated by
+// mtime+size (both come off one stat() call, so checking size is free) of
+// every file Rollup's own module graph says contributed to the bundle — not
+// a hand-maintained file list, so added/removed imports are picked up the
+// moment they change what's in that graph.
+//
+// consumerConfig can carry plugin functions/closures, which have no stable
+// serialized form to key a plain Map by — so it's partitioned by object
+// identity instead (an inner Map, whose keys are compared by reference).
+// BuildContextConfig documents consumerConfig as resolved once at adapter
+// startup and passed the same object on every call, so identity is the
+// correct cache boundary here, not a compromise: two different objects are
+// two different configs, even if structurally identical.
 interface FileFingerprint {
   mtimeMs: number;
   size: number;
@@ -219,7 +227,7 @@ interface BundleCacheEntry {
   fileFingerprints: Map<string, FileFingerprint>;
 }
 
-const bundleCache = new Map<string, BundleCacheEntry>();
+const bundleCache = new Map<string, Map<ConsumerViteConfig | undefined, BundleCacheEntry>>();
 
 function fingerprint(file: string): FileFingerprint | undefined {
   try {
@@ -280,39 +288,41 @@ export async function buildBundledContext(config: BuildBundledContextConfig, use
   const sandbox = await createSandbox(config, userAgent);
   sandbox.module = { exports: {} };
 
-  const { srcDir, entry, consumerConfig } = config;
-  const cacheKey = `${srcDir}::${entry}`;
-  const cached = bundleCache.get(cacheKey);
-  const code = cached && !isBundleCacheEntryStale(cached) ? cached.code : await rebundleAndCache(cacheKey, srcDir, entry, consumerConfig);
-
-  vm.runInContext(code, sandbox, { filename: entry });
+  const code = await getBundledCode(config);
+  vm.runInContext(code, sandbox, { filename: config.entry });
 
   return sandbox;
 }
 
-async function rebundleAndCache(
-  cacheKey: string,
-  srcDir: string,
-  entry: string,
-  consumerConfig: ConsumerViteConfig | undefined
-): Promise<string> {
-  const { code, moduleIds } = await bundleEntry(srcDir, entry, consumerConfig);
+async function getBundledCode(config: BuildBundledContextConfig): Promise<string> {
+  const byConfig = bundleCache.get(`${config.srcDir}::${config.entry}`);
+  const cached = byConfig?.get(config.consumerConfig);
+  if (cached && !isBundleCacheEntryStale(cached)) {
+    return cached.code;
+  }
+
+  return rebundleAndCache(config);
+}
+
+async function rebundleAndCache(config: BuildBundledContextConfig): Promise<string> {
+  const { code, moduleIds } = await bundleEntry(config);
 
   const fileFingerprints = new Map<string, FileFingerprint>();
   for (const file of moduleIds) {
     const print = fingerprint(file);
     if (print) fileFingerprints.set(file, print);
   }
-  bundleCache.set(cacheKey, { code, fileFingerprints });
+
+  const primaryKey = `${config.srcDir}::${config.entry}`;
+  const byConfig = bundleCache.get(primaryKey) ?? new Map<ConsumerViteConfig | undefined, BundleCacheEntry>();
+  byConfig.set(config.consumerConfig, { code, fileFingerprints });
+  bundleCache.set(primaryKey, byConfig);
 
   return code;
 }
 
-async function bundleEntry(
-  srcDir: string,
-  entry: string,
-  consumerConfig: ConsumerViteConfig | undefined
-): Promise<{ code: string; moduleIds: readonly string[] }> {
+async function bundleEntry(config: BuildBundledContextConfig): Promise<{ code: string; moduleIds: readonly string[] }> {
+  const { srcDir, entry, consumerConfig } = config;
   const result = await build({
     root: srcDir,
     configFile: false,
