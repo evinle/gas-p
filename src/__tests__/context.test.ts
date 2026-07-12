@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, cpSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { execFileSync } from 'child_process';
+import { build } from 'vite';
 import { buildContext, buildBundledContext } from '../core/context.js';
 import { GasPNotImplementedError, GasPMissingCredentialsError } from '../errors.js';
 
@@ -11,9 +12,36 @@ vi.mock('child_process', () => ({
   execFileSync: vi.fn(),
 }));
 
-const mockExecFileSync = vi.mocked(execFileSync);
+// Wraps vite's real build() in a spy instead of replacing it — the bundled-
+// context tests below need actual bundling to happen, just with a call count
+// visible for the bundle-cache tests. vi.hoisted is required here since
+// vi.mock factories are hoisted above ordinary top-level declarations.
+const viteState = vi.hoisted(() => ({ actualBuild: undefined as unknown as typeof import('vite').build }));
+vi.mock('vite', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vite')>();
+  viteState.actualBuild = actual.build;
+  return { ...actual, build: vi.fn() };
+});
 
-beforeEach(() => { vi.resetAllMocks(); });
+// Same call-through-spy shape as the vite mock above, for the raw .gs/.js
+// source-compile-cache tests — everything but readFileSync passes through
+// to the real fs module untouched.
+const fsState = vi.hoisted(() => ({ actualReadFileSync: undefined as unknown as typeof import('fs').readFileSync }));
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  fsState.actualReadFileSync = actual.readFileSync;
+  return { ...actual, readFileSync: vi.fn() };
+});
+
+const mockExecFileSync = vi.mocked(execFileSync);
+const mockBuild = vi.mocked(build);
+const mockReadFileSync = vi.mocked(readFileSync);
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  mockBuild.mockImplementation(viteState.actualBuild);
+  mockReadFileSync.mockImplementation(fsState.actualReadFileSync);
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(__dirname, '__fixtures__', 'harness');
@@ -220,6 +248,48 @@ describe('buildContext', () => {
       expect(() => sandbox.CalendarApp.getDefaultCalendar()).toThrow(/primary/);
     });
   });
+
+  describe('source caching', () => {
+    let scratchDir: string;
+
+    beforeEach(() => {
+      scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-source-cache-'));
+      writeFileSync(join(scratchDir, 'Code.gs'), 'function getGreeting(name) {\n  return "Hello, " + name;\n}\n');
+    });
+
+    afterEach(() => {
+      rmSync(scratchDir, { recursive: true, force: true });
+    });
+
+    it('reuses the compiled source across two calls when the file has not changed', async () => {
+      await buildContext({ srcDir: scratchDir });
+      mockReadFileSync.mockClear();
+
+      await buildContext({ srcDir: scratchDir });
+      expect(mockReadFileSync).not.toHaveBeenCalled();
+    });
+
+    it('recompiles when the source file changes between calls, and reflects the new source', async () => {
+      await buildContext({ srcDir: scratchDir });
+
+      writeFileSync(join(scratchDir, 'Code.gs'), 'function getGreeting(name) {\n  return "Howdy there, " + name;\n}\n');
+
+      const sandbox = await buildContext({ srcDir: scratchDir });
+      expect(sandbox.getGreeting('World')).toBe('Howdy there, World');
+    });
+
+    it('does not leak module-level state between two calls with unchanged, cached source', async () => {
+      writeFileSync(join(scratchDir, 'Code.gs'), 'var counter = 0;\nfunction increment() {\n  counter++;\n  return counter;\n}\n');
+
+      const first = await buildContext({ srcDir: scratchDir });
+      expect(first.increment()).toBe(1);
+
+      mockReadFileSync.mockClear();
+      const second = await buildContext({ srcDir: scratchDir });
+      expect(mockReadFileSync).not.toHaveBeenCalled(); // confirms this case actually hit the cache
+      expect(second.increment()).toBe(1);
+    });
+  });
 });
 
 describe('buildBundledContext', () => {
@@ -262,5 +332,56 @@ describe('buildBundledContext', () => {
     const fixturesFile = join(FIXTURES_FIXTURES, 'basic', 'gas-p.fixtures.ts');
     const sandbox = await buildBundledContext({ srcDir: dir, entry: 'Code.ts', fixturesFile });
     expect(sandbox.SpreadsheetApp.someUnimplementedMethod()).toBe('a static value');
+  });
+
+  describe('bundle caching', () => {
+    // Each test gets its own scratch copy of the fixture (never the committed
+    // multi-file-import dir directly) — the bundle cache is keyed by srcDir,
+    // and other tests in this file already build against that shared,
+    // committed dir, so reusing it here would start these tests with a warm
+    // cache instead of the cold one each case actually wants to assert on.
+    let scratchDir: string;
+
+    beforeEach(() => {
+      scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-bundle-cache-'));
+      cpSync(join(CONTEXT_FIXTURES, 'multi-file-import'), scratchDir, { recursive: true });
+    });
+
+    afterEach(() => {
+      rmSync(scratchDir, { recursive: true, force: true });
+    });
+
+    it('reuses the cached bundle across two calls when the source has not changed', async () => {
+      await buildBundledContext({ srcDir: scratchDir, entry: 'Code.ts' });
+      await buildBundledContext({ srcDir: scratchDir, entry: 'Code.ts' });
+      expect(mockBuild).toHaveBeenCalledTimes(1);
+    });
+
+    it('rebuilds when a source file changes between calls, and reflects the new source', async () => {
+      await buildBundledContext({ srcDir: scratchDir, entry: 'Code.ts' });
+
+      writeFileSync(
+        join(scratchDir, 'Utils.ts'),
+        "export function greetingFor(name: string): string {\n  return 'Howdy there, ' + name;\n}\n"
+      );
+
+      const sandbox = await buildBundledContext({ srcDir: scratchDir, entry: 'Code.ts' });
+      expect(mockBuild).toHaveBeenCalledTimes(2);
+      expect(sandbox.getGreeting('World')).toBe('Howdy there, World');
+    });
+
+    it('does not leak module-level state between two calls with unchanged, cached source', async () => {
+      writeFileSync(
+        join(scratchDir, 'Code.ts'),
+        'let counter = 0;\nfunction increment() {\n  counter++;\n  return counter;\n}\n'
+      );
+
+      const first = await buildBundledContext({ srcDir: scratchDir, entry: 'Code.ts' });
+      expect(first.increment()).toBe(1);
+
+      const second = await buildBundledContext({ srcDir: scratchDir, entry: 'Code.ts' });
+      expect(mockBuild).toHaveBeenCalledTimes(1); // confirms the bundle actually was cached for this case
+      expect(second.increment()).toBe(1);
+    });
   });
 });

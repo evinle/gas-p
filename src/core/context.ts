@@ -1,5 +1,5 @@
 import vm from 'node:vm';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { build } from 'vite';
 import type { InlineConfig } from 'vite';
@@ -194,11 +194,78 @@ export async function buildContext(config: BuildContextConfig, userAgent?: strin
     throw new Error(`No .gs/.js source found in ${srcDir} — for a .ts project, use buildBundledContext(srcDir, entry) instead.`);
   }
   for (const file of sourceFiles) {
-    const contents = readFileSync(join(srcDir, file), 'utf-8');
-    vm.runInContext(contents, sandbox, { filename: file });
+    const script = getCompiledScript(join(srcDir, file), file);
+    script.runInContext(sandbox);
   }
 
   return sandbox;
+}
+
+// Caches buildBundledContext's Rollup output across calls with the same
+// srcDir+entry, keyed as a plain string — rebuilding a fresh vm.Context and
+// re-running the (possibly cached) bundle still happens on every call
+// regardless, so per-request execution freshness is untouched by this cache.
+// Invalidated by mtime+size (both come off one stat() call, so checking size
+// is free) of every file Rollup's own module graph says contributed to the
+// bundle — not a hand-maintained file list, so added/removed imports are
+// picked up the moment they change what's in that graph.
+interface FileFingerprint {
+  mtimeMs: number;
+  size: number;
+}
+
+interface BundleCacheEntry {
+  code: string;
+  fileFingerprints: Map<string, FileFingerprint>;
+}
+
+const bundleCache = new Map<string, BundleCacheEntry>();
+
+function fingerprint(file: string): FileFingerprint | undefined {
+  try {
+    const stat = statSync(file);
+    return { mtimeMs: stat.mtimeMs, size: stat.size };
+  } catch {
+    return undefined;
+  }
+}
+
+function fingerprintsMatch(a: FileFingerprint, b: FileFingerprint): boolean {
+  return a.mtimeMs === b.mtimeMs && a.size === b.size;
+}
+
+// Caches buildContext's compiled raw .gs/.js source per file, invalidated by
+// the same mtime+size fingerprint as the bundle cache above. Only the parse/
+// compile step (new vm.Script) is reused — script.runInContext(sandbox) below
+// still executes fresh into a brand-new sandbox on every buildContext call.
+interface CompiledScriptCacheEntry {
+  script: vm.Script;
+  fileFingerprint: FileFingerprint;
+}
+
+const compiledScriptCache = new Map<string, CompiledScriptCacheEntry>();
+
+function getCompiledScript(absolutePath: string, filename: string): vm.Script {
+  const currentFingerprint = fingerprint(absolutePath);
+  const cached = compiledScriptCache.get(absolutePath);
+  if (cached && currentFingerprint && fingerprintsMatch(cached.fileFingerprint, currentFingerprint)) {
+    return cached.script;
+  }
+
+  const contents = readFileSync(absolutePath, 'utf-8');
+  const script = new vm.Script(contents, { filename });
+  if (currentFingerprint) {
+    compiledScriptCache.set(absolutePath, { script, fileFingerprint: currentFingerprint });
+  }
+  return script;
+}
+
+function isBundleCacheEntryStale(entry: BundleCacheEntry): boolean {
+  for (const [file, recorded] of entry.fileFingerprints) {
+    const current = fingerprint(file);
+    if (!current || current.mtimeMs !== recorded.mtimeMs || current.size !== recorded.size) return true;
+  }
+  return false;
 }
 
 // Bundles `entry` (a .ts file with real imports) via Vite's build({ write: false })
@@ -214,6 +281,38 @@ export async function buildBundledContext(config: BuildBundledContextConfig, use
   sandbox.module = { exports: {} };
 
   const { srcDir, entry, consumerConfig } = config;
+  const cacheKey = `${srcDir}::${entry}`;
+  const cached = bundleCache.get(cacheKey);
+  const code = cached && !isBundleCacheEntryStale(cached) ? cached.code : await rebundleAndCache(cacheKey, srcDir, entry, consumerConfig);
+
+  vm.runInContext(code, sandbox, { filename: entry });
+
+  return sandbox;
+}
+
+async function rebundleAndCache(
+  cacheKey: string,
+  srcDir: string,
+  entry: string,
+  consumerConfig: ConsumerViteConfig | undefined
+): Promise<string> {
+  const { code, moduleIds } = await bundleEntry(srcDir, entry, consumerConfig);
+
+  const fileFingerprints = new Map<string, FileFingerprint>();
+  for (const file of moduleIds) {
+    const print = fingerprint(file);
+    if (print) fileFingerprints.set(file, print);
+  }
+  bundleCache.set(cacheKey, { code, fileFingerprints });
+
+  return code;
+}
+
+async function bundleEntry(
+  srcDir: string,
+  entry: string,
+  consumerConfig: ConsumerViteConfig | undefined
+): Promise<{ code: string; moduleIds: readonly string[] }> {
   const result = await build({
     root: srcDir,
     configFile: false,
@@ -244,9 +343,7 @@ export async function buildBundledContext(config: BuildBundledContextConfig, use
     throw new Error(`Vite produced no entry chunk for ${entry}`);
   }
 
-  vm.runInContext(entryChunk.code, sandbox, { filename: entry });
-
-  return sandbox;
+  return { code: entryChunk.code, moduleIds: entryChunk.moduleIds };
 }
 
 export { isHtmlOutput };
