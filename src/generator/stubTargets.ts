@@ -233,4 +233,20 @@ export const stubTargets: StubTarget[] = [
     outputName: 'LinearOptimizationService',
     existingShimFile: join(SRC_ROOT, 'shims/LinearOptimizationService.ts'),
   },
+  // Advanced Calendar service (#45) — distinct from the basic CalendarApp
+  // targets above (different .d.ts file, different global). outputName is
+  // 'AdvancedCalendar', not 'Calendar', since CalendarApp.ts already owns the
+  // generated output name 'Calendar' for its own per-event Calendar object.
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar',
+    outputName: 'AdvancedCalendar',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Collection.EventsCollection',
+    outputName: 'CalendarEvents',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
 ];

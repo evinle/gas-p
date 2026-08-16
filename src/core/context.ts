@@ -35,7 +35,8 @@ import { ContentService } from '../shims/ContentService.js';
 import { Charts } from '../shims/Charts.js';
 import { Maps } from '../shims/Maps.js';
 import { LinearOptimizationService } from '../shims/LinearOptimizationService.js';
-import { applyFixtures, loadFixtures } from './fixtures.js';
+import { Calendar } from '../shims/Calendar.js';
+import { applyFixtures, isRecord, loadFixtures } from './fixtures.js';
 import type { GoogleCredentials } from './credentials.js';
 
 // Already-instantiated singletons with no per-request construction — safe to
@@ -94,6 +95,12 @@ interface ConfiguredService {
   // eligible like the stub-only STATIC_SERVICES; HtmlService/PropertiesService
   // are fully-local/real and excluded, same as Utilities/CacheService/etc.
   fixtureEligible: boolean;
+  // Property names on the created instance that are themselves composed
+  // sub-collections (e.g. Calendar.Events, per #45) needing their own
+  // Declared Fixtures wrapping, one level under this service's own
+  // (fixtures.Calendar.Events, not a top-level fixtures key of its own).
+  // Absent/empty for every flat, non-composed service.
+  nestedFixtureKeys?: string[];
   create(params: SandboxBuildParams): unknown;
 }
 
@@ -120,6 +127,12 @@ const CONFIGURED_SERVICES: ConfiguredService[] = [
     name: 'Session',
     fixtureEligible: true,
     create: ({ srcDir, services }) => new Session(services, srcDir),
+  },
+  {
+    name: 'Calendar',
+    fixtureEligible: true,
+    nestedFixtureKeys: ['Events'],
+    create: () => Calendar,
   },
 ];
 
@@ -171,11 +184,17 @@ async function createSandbox(config: BuildContextConfig, userAgent?: string): Pr
   const fixtures = await loadFixtures(config.fixturesFile);
   for (const name of Object.keys(STATIC_SERVICES)) {
     if (FIXTURE_EXCLUDED_STATIC_SERVICES.has(name)) continue;
-    sandbox[name] = applyFixtures(name, sandbox[name] as object, fixtures);
+    const instance: unknown = sandbox[name];
+    if (!isRecord(instance)) throw new Error(`Expected sandbox global '${name}' to be an object, got ${typeof instance}`);
+    sandbox[name] = applyFixtures(name, instance, fixtures);
   }
   for (const configured of CONFIGURED_SERVICES) {
     if (!configured.fixtureEligible) continue;
-    sandbox[configured.name] = applyFixtures(configured.name, sandbox[configured.name] as object, fixtures);
+    const instance: unknown = sandbox[configured.name];
+    if (!isRecord(instance)) {
+      throw new Error(`Expected sandbox global '${configured.name}' to be an object, got ${typeof instance}`);
+    }
+    sandbox[configured.name] = applyFixtures(configured.name, instance, fixtures, configured.nestedFixtureKeys);
   }
 
   return sandbox;

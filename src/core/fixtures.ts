@@ -95,12 +95,6 @@ export type GasPFixtures = Partial<{
   [K in keyof EligibleServiceInstances]: TypedServiceFixtures<EligibleServiceInstances[K]>;
 }>;
 
-// Loose runtime shape used internally — GasPFixtures's strict, name-checked
-// keys exist for consumers authoring gas-p.fixtures.ts, but applyFixtures/
-// loadFixtures index by a plain runtime string (the service name being
-// wrapped, or whatever loadConfigFromFile handed back), not a literal key.
-type LooseGasPFixtures = Record<string, Record<string, unknown>>;
-
 // Identity helper mirroring defineGasPConfig — no runtime behavior, just IDE
 // type-hinting for a hand-authored gas-p.fixtures.ts.
 export function defineGasPFixtures(fixtures: GasPFixtures): GasPFixtures {
@@ -123,20 +117,65 @@ export async function loadFixtures(fixturesFile: string | undefined): Promise<Ga
   return loaded.config;
 }
 
+// Exported for context.ts's sandbox-global lookups too — vm.Context indexing
+// resolves to `any`, so this is how callers narrow to `object` (applyFixtures'
+// own constraint) without an `as` assertion.
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+// Looks up one service's (or, for a composed service like Calendar, one of
+// its sub-collections') Declared Fixtures out of the loosely-shaped runtime
+// fixtures tree, without asserting GasPFixtures's strict, name-checked shape
+// onto it — Reflect.get sidesteps the missing index signature instead.
+function lookupFixtures(fixtures: object, key: string): Record<string, unknown> | undefined {
+  const value: unknown = Reflect.get(fixtures, key);
+  return isRecord(value) ? value : undefined;
+}
+
 // Wraps a service singleton so a matching Declared Fixture answers a method
 // call instead of the real implementation — only intercepts the object's own
-// top-level method names, not anything a call happens to return.
-export function applyFixtures<T extends object>(serviceName: string, instance: T, fixtures: GasPFixtures): T {
-  const methodFixtures = (fixtures as LooseGasPFixtures)[serviceName];
-  if (!methodFixtures) return instance;
+// top-level method names, not anything a call happens to return, with one
+// exception: nestedFixtureKeys (for a composed service like Calendar, #45 —
+// Calendar.Events, Calendar.Acl, ...) get their own nested wrapping, applied
+// lazily on each property access rather than by mutating the target, since
+// composed services (like flat ones) are shared, module-level singletons —
+// mutating instance.Events directly would leak one build's fixtures into
+// every other buildContext call sharing the same underlying instance.
+function wrapWithFixtures<T extends object>(
+  instance: T,
+  methodFixtures: Record<string, unknown> | undefined,
+  nestedFixtureKeys: readonly string[]
+): T {
+  const nestedKeys = new Set(nestedFixtureKeys);
+  if (!methodFixtures && nestedKeys.size === 0) return instance;
 
   return new Proxy(instance, {
     get(target, prop, receiver) {
-      if (typeof prop === 'string' && Object.prototype.hasOwnProperty.call(methodFixtures, prop)) {
+      const value: unknown = Reflect.get(target, prop, receiver);
+      if (typeof prop === 'string' && nestedKeys.has(prop)) {
+        if (!isRecord(value)) {
+          throw new Error(`Expected composed property '${prop}' to be an object, got ${typeof value}`);
+        }
+        return wrapWithFixtures(value, methodFixtures && lookupFixtures(methodFixtures, prop), []);
+      }
+      if (typeof prop === 'string' && methodFixtures && Object.prototype.hasOwnProperty.call(methodFixtures, prop)) {
         const fixture = methodFixtures[prop];
         return (...args: unknown[]) => (typeof fixture === 'function' ? fixture(...args) : fixture);
       }
-      return Reflect.get(target, prop, receiver);
+      return value;
     },
   });
+}
+
+// Public entry point — GasPFixtures's strict, name-checked keys exist for
+// consumers authoring gas-p.fixtures.ts, so this is the only place that
+// indexes it by a plain runtime string (the service name being wrapped).
+export function applyFixtures<T extends object>(
+  serviceName: string,
+  instance: T,
+  fixtures: GasPFixtures,
+  nestedFixtureKeys: readonly string[] = []
+): T {
+  return wrapWithFixtures(instance, lookupFixtures(fixtures, serviceName), nestedFixtureKeys);
 }

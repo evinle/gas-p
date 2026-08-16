@@ -91,6 +91,20 @@ describe('buildContext', () => {
     expect(() => sandbox.SpreadsheetApp.getActiveSpreadsheet()).toThrow(/getActiveSpreadsheet/);
   });
 
+  it('exposes Calendar (advanced service) as a sandbox global with Events.patch reachable, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.Calendar.Events.patch()).toThrow(GasPNotImplementedError);
+    expect(() => sandbox.Calendar.Events.patch()).toThrow(/patch/);
+  });
+
+  it('answers Calendar.Events.patch from a nested gas-p.fixtures.ts declaration', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const fixturesFile = join(FIXTURES_FIXTURES, 'calendar-events', 'gas-p.fixtures.ts');
+    const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+    expect(sandbox.Calendar.Events.patch()).toEqual({ id: 'evt-fixture' });
+  });
+
   it('exposes PropertiesService as a sandbox global with no services option needed', async () => {
     // Only checks reachability, without calling getScriptProperties() — doing
     // so would write a gas-p.properties.json into this committed fixture dir.
