@@ -124,6 +124,43 @@ describe('buildContext', () => {
     expect(sandbox.People.ContactGroups.Members.modify()).toEqual({ resourceNames: ['people/fixture'] });
   });
 
+  it('exposes Docs (advanced service) with Documents reachable, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.Docs.Documents.get()).toThrow(GasPNotImplementedError);
+  });
+
+  it('exposes Tasks (advanced service) with Tasklists reachable, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.Tasks.Tasklists.list()).toThrow(GasPNotImplementedError);
+  });
+
+  it('exposes Sheets (advanced service) with Spreadsheets.Values reachable two levels deep, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.Sheets.Spreadsheets.Values.get()).toThrow(GasPNotImplementedError);
+  });
+
+  it('answers Sheets.Spreadsheets.Values.get from a doubly-nested gas-p.fixtures.ts declaration', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const fixturesFile = join(FIXTURES_FIXTURES, 'sheets-spreadsheets-values', 'gas-p.fixtures.ts');
+    const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+    expect(sandbox.Sheets.Spreadsheets.Values.get()).toEqual({ values: [['fixture']] });
+  });
+
+  it('exposes BigQuery (advanced service) with Datasets reachable, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.BigQuery.Datasets.list()).toThrow(GasPNotImplementedError);
+  });
+
+  it('exposes Drive (advanced service) with Files reachable, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.Drive.Files.list()).toThrow(GasPNotImplementedError);
+  });
+
   it('exposes PropertiesService as a sandbox global with no services option needed', async () => {
     // Only checks reachability, without calling getScriptProperties() — doing
     // so would write a gas-p.properties.json into this committed fixture dir.

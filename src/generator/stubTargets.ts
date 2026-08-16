@@ -331,4 +331,194 @@ export const stubTargets: StubTarget[] = [
     outputName: 'PeoplePeopleConnections',
     existingShimFile: join(SRC_ROOT, 'shims/People.ts'),
   },
+  // Advanced Docs service — flat, single collection.
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/docs_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Docs',
+    outputName: 'Docs',
+    existingShimFile: join(SRC_ROOT, 'shims/Docs.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/docs_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Docs.Collection.DocumentsCollection',
+    outputName: 'DocsDocuments',
+    existingShimFile: join(SRC_ROOT, 'shims/Docs.ts'),
+  },
+  // Advanced Tasks service — flat, two collections.
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/tasks_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Tasks',
+    outputName: 'Tasks',
+    existingShimFile: join(SRC_ROOT, 'shims/Tasks.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/tasks_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Tasks.Collection.TasklistsCollection',
+    outputName: 'TasksTasklists',
+    existingShimFile: join(SRC_ROOT, 'shims/Tasks.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/tasks_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Tasks.Collection.TasksCollection',
+    outputName: 'TasksTasks',
+    existingShimFile: join(SRC_ROOT, 'shims/Tasks.ts'),
+  },
+  // Advanced Sheets service — Spreadsheets nests DeveloperMetadata/Sheets/
+  // Values one further level, like People's ContactGroups/People.
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/sheets_v4.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Sheets',
+    outputName: 'Sheets',
+    existingShimFile: join(SRC_ROOT, 'shims/Sheets.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/sheets_v4.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Sheets.Collection.SpreadsheetsCollection',
+    outputName: 'SheetsSpreadsheets',
+    existingShimFile: join(SRC_ROOT, 'shims/Sheets.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/sheets_v4.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Sheets.Collection.Spreadsheets.DeveloperMetadataCollection',
+    outputName: 'SheetsSpreadsheetsDeveloperMetadata',
+    existingShimFile: join(SRC_ROOT, 'shims/Sheets.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/sheets_v4.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Sheets.Collection.Spreadsheets.SheetsCollection',
+    outputName: 'SheetsSpreadsheetsSheets',
+    existingShimFile: join(SRC_ROOT, 'shims/Sheets.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/sheets_v4.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Sheets.Collection.Spreadsheets.ValuesCollection',
+    outputName: 'SheetsSpreadsheetsValues',
+    existingShimFile: join(SRC_ROOT, 'shims/Sheets.ts'),
+  },
+  // Advanced BigQuery service — flat, five collections.
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/bigquery_v2.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.BigQuery',
+    outputName: 'BigQuery',
+    existingShimFile: join(SRC_ROOT, 'shims/BigQuery.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/bigquery_v2.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.BigQuery.Collection.DatasetsCollection',
+    outputName: 'BigQueryDatasets',
+    existingShimFile: join(SRC_ROOT, 'shims/BigQuery.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/bigquery_v2.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.BigQuery.Collection.JobsCollection',
+    outputName: 'BigQueryJobs',
+    existingShimFile: join(SRC_ROOT, 'shims/BigQuery.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/bigquery_v2.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.BigQuery.Collection.ProjectsCollection',
+    outputName: 'BigQueryProjects',
+    existingShimFile: join(SRC_ROOT, 'shims/BigQuery.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/bigquery_v2.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.BigQuery.Collection.TabledataCollection',
+    outputName: 'BigQueryTabledata',
+    existingShimFile: join(SRC_ROOT, 'shims/BigQuery.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/bigquery_v2.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.BigQuery.Collection.TablesCollection',
+    outputName: 'BigQueryTables',
+    existingShimFile: join(SRC_ROOT, 'shims/BigQuery.ts'),
+  },
+  // Advanced Drive service — flat, thirteen collections. Its collection
+  // interfaces live under a different namespace path (Drive_v3.Drive.V3.
+  // Collection.*) than the root (GoogleAppsScript.Drive) — a quirk of how
+  // @types/google-apps-script models this one service, not something gas-p
+  // chose.
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive',
+    outputName: 'Drive',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.AboutCollection',
+    outputName: 'DriveAbout',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.AppsCollection',
+    outputName: 'DriveApps',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.ChangesCollection',
+    outputName: 'DriveChanges',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.ChannelsCollection',
+    outputName: 'DriveChannels',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.CommentsCollection',
+    outputName: 'DriveComments',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.DrivesCollection',
+    outputName: 'DriveDrives',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.FilesCollection',
+    outputName: 'DriveFiles',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.OperationCollection',
+    outputName: 'DriveOperation',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.OperationsCollection',
+    outputName: 'DriveOperations',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.PermissionsCollection',
+    outputName: 'DrivePermissions',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.RepliesCollection',
+    outputName: 'DriveReplies',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.RevisionsCollection',
+    outputName: 'DriveRevisions',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/drive_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Drive_v3.Drive.V3.Collection.TeamdrivesCollection',
+    outputName: 'DriveTeamdrives',
+    existingShimFile: join(SRC_ROOT, 'shims/Drive.ts'),
+  },
 ];

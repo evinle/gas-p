@@ -26,4 +26,11 @@ export default defineGasPFixtures({
       },
     },
   },
+  Sheets: {
+    Spreadsheets: {
+      Values: {
+        get: () => ({ values: [["fixture"]] }),
+      },
+    },
+  },
 });

@@ -37,6 +37,11 @@ import { Maps } from '../shims/Maps.js';
 import { LinearOptimizationService } from '../shims/LinearOptimizationService.js';
 import { Calendar } from '../shims/Calendar.js';
 import { People } from '../shims/People.js';
+import { Docs } from '../shims/Docs.js';
+import { Tasks } from '../shims/Tasks.js';
+import { Sheets } from '../shims/Sheets.js';
+import { BigQuery } from '../shims/BigQuery.js';
+import { Drive } from '../shims/Drive.js';
 import { applyFixtures, isRecord, loadFixtures, type NestedFixtureKeys } from './fixtures.js';
 import type { GoogleCredentials } from './credentials.js';
 
@@ -153,6 +158,58 @@ const CONFIGURED_SERVICES: ConfiguredService[] = [
       People: { Connections: {} },
     },
     create: () => People,
+  },
+  {
+    name: 'Docs',
+    fixtureEligible: true,
+    nestedFixtureKeys: { Documents: {} },
+    create: () => Docs,
+  },
+  {
+    name: 'Tasks',
+    fixtureEligible: true,
+    nestedFixtureKeys: { Tasklists: {}, Tasks: {} },
+    create: () => Tasks,
+  },
+  {
+    name: 'Sheets',
+    fixtureEligible: true,
+    nestedFixtureKeys: {
+      Spreadsheets: { DeveloperMetadata: {}, Sheets: {}, Values: {} },
+    },
+    create: () => Sheets,
+  },
+  {
+    name: 'BigQuery',
+    fixtureEligible: true,
+    nestedFixtureKeys: {
+      Datasets: {},
+      Jobs: {},
+      Projects: {},
+      Tabledata: {},
+      Tables: {},
+    },
+    create: () => BigQuery,
+  },
+  {
+    name: 'Drive',
+    fixtureEligible: true,
+    nestedFixtureKeys: {
+      About: {},
+      Apps: {},
+      Changes: {},
+      Channels: {},
+      Comments: {},
+      Drives: {},
+      Files: {},
+      Operation: {},
+      Operations: {},
+      Permissions: {},
+      Replies: {},
+      Revisions: {},
+      Teamdrives: {},
+    },
+    create: () => Drive,
   },
 ];
 

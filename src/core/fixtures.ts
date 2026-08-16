@@ -25,6 +25,11 @@ import type { CalendarApp } from '../shims/CalendarApp.js';
 import type { Session } from '../shims/Session.js';
 import type { Calendar } from '../shims/Calendar.js';
 import type { People } from '../shims/People.js';
+import type { Docs } from '../shims/Docs.js';
+import type { Tasks } from '../shims/Tasks.js';
+import type { Sheets } from '../shims/Sheets.js';
+import type { BigQuery } from '../shims/BigQuery.js';
+import type { Drive } from '../shims/Drive.js';
 
 // The STATIC_SERVICES entries eligible for Declared Fixtures (context.ts's
 // FIXTURE_EXCLUDED_STATIC_SERVICES excludes Utilities/CacheService/
@@ -58,6 +63,11 @@ interface EligibleServiceInstances {
   LinearOptimizationService: typeof LinearOptimizationService;
   Calendar: typeof Calendar;
   People: typeof People;
+  Docs: typeof Docs;
+  Tasks: typeof Tasks;
+  Sheets: typeof Sheets;
+  BigQuery: typeof BigQuery;
+  Drive: typeof Drive;
 }
 
 // True only for T = never — boxed in a tuple so the check doesn't hit
