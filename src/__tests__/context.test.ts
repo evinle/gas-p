@@ -105,6 +105,25 @@ describe('buildContext', () => {
     expect(sandbox.Calendar.Events.patch()).toEqual({ id: 'evt-fixture' });
   });
 
+  it('exposes Calendar.Acl, a second (flat) sub-collection, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.Calendar.Acl.get()).toThrow(GasPNotImplementedError);
+  });
+
+  it('exposes People (advanced service) with People.ContactGroups.Members reachable two levels deep, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.People.ContactGroups.Members.modify()).toThrow(GasPNotImplementedError);
+  });
+
+  it('answers People.ContactGroups.Members.list from a doubly-nested gas-p.fixtures.ts declaration', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const fixturesFile = join(FIXTURES_FIXTURES, 'people-contact-groups-members', 'gas-p.fixtures.ts');
+    const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+    expect(sandbox.People.ContactGroups.Members.modify()).toEqual({ resourceNames: ['people/fixture'] });
+  });
+
   it('exposes PropertiesService as a sandbox global with no services option needed', async () => {
     // Only checks reachability, without calling getScriptProperties() — doing
     // so would write a gas-p.properties.json into this committed fixture dir.

@@ -23,6 +23,8 @@ import type { Maps } from '../shims/Maps.js';
 import type { LinearOptimizationService } from '../shims/LinearOptimizationService.js';
 import type { CalendarApp } from '../shims/CalendarApp.js';
 import type { Session } from '../shims/Session.js';
+import type { Calendar } from '../shims/Calendar.js';
+import type { People } from '../shims/People.js';
 
 // The STATIC_SERVICES entries eligible for Declared Fixtures (context.ts's
 // FIXTURE_EXCLUDED_STATIC_SERVICES excludes Utilities/CacheService/
@@ -54,6 +56,8 @@ interface EligibleServiceInstances {
   Charts: typeof Charts;
   Maps: typeof Maps;
   LinearOptimizationService: typeof LinearOptimizationService;
+  Calendar: typeof Calendar;
+  People: typeof People;
 }
 
 // True only for T = never — boxed in a tuple so the check doesn't hit
@@ -85,11 +89,20 @@ type DeepPartialFixture<T> = IsNever<T> extends true
           ? { [K in keyof T]?: DeepPartialFixture<T[K]> }
           : T;
 
-type MethodFixtureValue<M> = M extends (...args: infer A) => infer R
-  ? DeepPartialFixture<R> | ((...args: A) => DeepPartialFixture<R>)
-  : never;
-
-type TypedServiceFixtures<T> = { [K in keyof T]?: MethodFixtureValue<T[K]> };
+// Method-shaped members get a fixture value/answering function, same as
+// always. Object-shaped members (a composed service's sub-collections, e.g.
+// Calendar.Events or People.ContactGroups.Members — #45/#46) recurse into
+// their own TypedServiceFixtures instead of falling back to `never`, so
+// nested Declared Fixtures type-check to whatever depth a composed service's
+// shim actually nests, matching applyFixtures' runtime NestedFixtureKeys
+// recursion without needing its own hand-maintained depth here.
+type TypedServiceFixtures<T> = {
+  [K in keyof T]?: T[K] extends (...args: infer A) => infer R
+    ? DeepPartialFixture<R> | ((...args: A) => DeepPartialFixture<R>)
+    : T[K] extends object
+      ? TypedServiceFixtures<T[K]>
+      : never;
+};
 
 export type GasPFixtures = Partial<{
   [K in keyof EligibleServiceInstances]: TypedServiceFixtures<EligibleServiceInstances[K]>;
@@ -133,6 +146,15 @@ function lookupFixtures(fixtures: object, key: string): Record<string, unknown> 
   return isRecord(value) ? value : undefined;
 }
 
+// Describes a composed service's sub-collection tree for nested fixture
+// wrapping — e.g. Calendar's is flat ({ Events: {}, Acl: {}, ... }), while
+// People's ContactGroups/People collections each nest one further collection
+// of their own ({ ContactGroups: { Members: {} }, People: { Connections: {} },
+// OtherContacts: {} }), so this recurses to whatever depth a service needs.
+export interface NestedFixtureKeys {
+  readonly [key: string]: NestedFixtureKeys;
+}
+
 // Wraps a service singleton so a matching Declared Fixture answers a method
 // call instead of the real implementation — only intercepts the object's own
 // top-level method names, not anything a call happens to return, with one
@@ -145,19 +167,18 @@ function lookupFixtures(fixtures: object, key: string): Record<string, unknown> 
 function wrapWithFixtures<T extends object>(
   instance: T,
   methodFixtures: Record<string, unknown> | undefined,
-  nestedFixtureKeys: readonly string[]
+  nestedFixtureKeys: NestedFixtureKeys
 ): T {
-  const nestedKeys = new Set(nestedFixtureKeys);
-  if (!methodFixtures && nestedKeys.size === 0) return instance;
+  if (!methodFixtures && Object.keys(nestedFixtureKeys).length === 0) return instance;
 
   return new Proxy(instance, {
     get(target, prop, receiver) {
       const value: unknown = Reflect.get(target, prop, receiver);
-      if (typeof prop === 'string' && nestedKeys.has(prop)) {
+      if (typeof prop === 'string' && Object.prototype.hasOwnProperty.call(nestedFixtureKeys, prop)) {
         if (!isRecord(value)) {
           throw new Error(`Expected composed property '${prop}' to be an object, got ${typeof value}`);
         }
-        return wrapWithFixtures(value, methodFixtures && lookupFixtures(methodFixtures, prop), []);
+        return wrapWithFixtures(value, methodFixtures && lookupFixtures(methodFixtures, prop), nestedFixtureKeys[prop] ?? {});
       }
       if (typeof prop === 'string' && methodFixtures && Object.prototype.hasOwnProperty.call(methodFixtures, prop)) {
         const fixture = methodFixtures[prop];
@@ -175,7 +196,7 @@ export function applyFixtures<T extends object>(
   serviceName: string,
   instance: T,
   fixtures: GasPFixtures,
-  nestedFixtureKeys: readonly string[] = []
+  nestedFixtureKeys: NestedFixtureKeys = {}
 ): T {
   return wrapWithFixtures(instance, lookupFixtures(fixtures, serviceName), nestedFixtureKeys);
 }

@@ -36,7 +36,8 @@ import { Charts } from '../shims/Charts.js';
 import { Maps } from '../shims/Maps.js';
 import { LinearOptimizationService } from '../shims/LinearOptimizationService.js';
 import { Calendar } from '../shims/Calendar.js';
-import { applyFixtures, isRecord, loadFixtures } from './fixtures.js';
+import { People } from '../shims/People.js';
+import { applyFixtures, isRecord, loadFixtures, type NestedFixtureKeys } from './fixtures.js';
 import type { GoogleCredentials } from './credentials.js';
 
 // Already-instantiated singletons with no per-request construction — safe to
@@ -95,12 +96,12 @@ interface ConfiguredService {
   // eligible like the stub-only STATIC_SERVICES; HtmlService/PropertiesService
   // are fully-local/real and excluded, same as Utilities/CacheService/etc.
   fixtureEligible: boolean;
-  // Property names on the created instance that are themselves composed
-  // sub-collections (e.g. Calendar.Events, per #45) needing their own
-  // Declared Fixtures wrapping, one level under this service's own
-  // (fixtures.Calendar.Events, not a top-level fixtures key of its own).
-  // Absent/empty for every flat, non-composed service.
-  nestedFixtureKeys?: string[];
+  // Composed sub-collections on the created instance (e.g. Calendar.Events,
+  // per #45) needing their own Declared Fixtures wrapping, nested under this
+  // service's own (fixtures.Calendar.Events, not a top-level fixtures key of
+  // its own) — see NestedFixtureKeys for the tree shape. Absent/empty for
+  // every flat, non-composed service.
+  nestedFixtureKeys?: NestedFixtureKeys;
   create(params: SandboxBuildParams): unknown;
 }
 
@@ -131,8 +132,27 @@ const CONFIGURED_SERVICES: ConfiguredService[] = [
   {
     name: 'Calendar',
     fixtureEligible: true,
-    nestedFixtureKeys: ['Events'],
+    nestedFixtureKeys: {
+      Acl: {},
+      CalendarList: {},
+      Calendars: {},
+      Channels: {},
+      Colors: {},
+      Events: {},
+      Freebusy: {},
+      Settings: {},
+    },
     create: () => Calendar,
+  },
+  {
+    name: 'People',
+    fixtureEligible: true,
+    nestedFixtureKeys: {
+      ContactGroups: { Members: {} },
+      OtherContacts: {},
+      People: { Connections: {} },
+    },
+    create: () => People,
   },
 ];
 

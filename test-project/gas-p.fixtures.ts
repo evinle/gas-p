@@ -12,4 +12,18 @@ export default defineGasPFixtures({
       ],
     }),
   },
+  // Advanced Calendar/People (#45) — flat vs. nested composition, exercised
+  // here for real end-to-end type-checking against the built package.
+  Calendar: {
+    Events: {
+      patch: () => ({ id: "evt-fixture" }),
+    },
+  },
+  People: {
+    ContactGroups: {
+      Members: {
+        modify: () => ({ resourceNames: ["people/fixture"] }),
+      },
+    },
+  },
 });

@@ -249,4 +249,86 @@ export const stubTargets: StubTarget[] = [
     outputName: 'CalendarEvents',
     existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
   },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Collection.AclCollection',
+    outputName: 'CalendarAcl',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Collection.CalendarListCollection',
+    outputName: 'CalendarCalendarList',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Collection.CalendarsCollection',
+    outputName: 'CalendarCalendars',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Collection.ChannelsCollection',
+    outputName: 'CalendarChannels',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Collection.ColorsCollection',
+    outputName: 'CalendarColors',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Collection.FreebusyCollection',
+    outputName: 'CalendarFreebusy',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/calendar_v3.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.Calendar.Collection.SettingsCollection',
+    outputName: 'CalendarSettings',
+    existingShimFile: join(SRC_ROOT, 'shims/Calendar.ts'),
+  },
+  // Advanced People service (#45) — like Calendar, ContactGroups and People
+  // each nest one further collection of their own (ContactGroups.Members,
+  // People.Connections), so this isn't a flat Root -> Collection composition;
+  // shims/People.ts composes two levels.
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/peopleapi_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.People',
+    outputName: 'AdvancedPeople',
+    existingShimFile: join(SRC_ROOT, 'shims/People.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/peopleapi_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.People.Collection.ContactGroupsCollection',
+    outputName: 'PeopleContactGroups',
+    existingShimFile: join(SRC_ROOT, 'shims/People.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/peopleapi_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.People.Collection.ContactGroups.MembersCollection',
+    outputName: 'PeopleContactGroupsMembers',
+    existingShimFile: join(SRC_ROOT, 'shims/People.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/peopleapi_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.People.Collection.OtherContactsCollection',
+    outputName: 'PeopleOtherContacts',
+    existingShimFile: join(SRC_ROOT, 'shims/People.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/peopleapi_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.People.Collection.PeopleCollection',
+    outputName: 'PeoplePeople',
+    existingShimFile: join(SRC_ROOT, 'shims/People.ts'),
+  },
+  {
+    typesFile: resolveTypesFile('@types/google-apps-script/apis/peopleapi_v1.d.ts'),
+    qualifiedInterfaceName: 'GoogleAppsScript.People.Collection.People.ConnectionsCollection',
+    outputName: 'PeoplePeopleConnections',
+    existingShimFile: join(SRC_ROOT, 'shims/People.ts'),
+  },
 ];
