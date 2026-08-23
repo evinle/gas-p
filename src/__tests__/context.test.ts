@@ -161,6 +161,26 @@ describe('buildContext', () => {
     expect(() => sandbox.Drive.Files.list()).toThrow(GasPNotImplementedError);
   });
 
+  it('exposes Drive.Files.Comments.Replies reachable three levels deep, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.Drive.Files.Comments.Replies.get()).toThrow(GasPNotImplementedError);
+  });
+
+  it('exposes Drive.Files.Permissions and Drive.Files.Revisions, both nested one level under Files, throwing GasPNotImplementedError unfixtured', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const sandbox = await buildContext({ srcDir: dir });
+    expect(() => sandbox.Drive.Files.Permissions.list()).toThrow(GasPNotImplementedError);
+    expect(() => sandbox.Drive.Files.Revisions.list()).toThrow(GasPNotImplementedError);
+  });
+
+  it('answers Drive.Files.Comments.Replies.get from a triply-nested gas-p.fixtures.ts declaration', async () => {
+    const dir = join(FIXTURES, 'counter');
+    const fixturesFile = join(FIXTURES_FIXTURES, 'drive-files-comments-replies', 'gas-p.fixtures.ts');
+    const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+    expect(sandbox.Drive.Files.Comments.Replies.get()).toEqual({ id: 'reply-fixture' });
+  });
+
   it('exposes PropertiesService as a sandbox global with no services option needed', async () => {
     // Only checks reachability, without calling getScriptProperties() — doing
     // so would write a gas-p.properties.json into this committed fixture dir.
