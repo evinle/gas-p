@@ -231,6 +231,26 @@ describe('buildContext', () => {
       }
     });
 
+    it('answers UrlFetchApp.fetch from gas-p.fixtures.ts instead of spawning the real fetch subprocess', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const fixturesFile = join(FIXTURES_FIXTURES, 'urlfetchapp', 'gas-p.fixtures.ts');
+      const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+      expect(sandbox.UrlFetchApp.fetch('https://example.com').getContentText()).toBe('fixture:https://example.com');
+      expect(mockExecFileSync).not.toHaveBeenCalled();
+    });
+
+    it('answers UrlFetchApp.fetchAll from gas-p.fixtures.ts instead of spawning the real fetch subprocess', async () => {
+      const dir = join(FIXTURES, 'counter');
+      const fixturesFile = join(FIXTURES_FIXTURES, 'urlfetchapp', 'gas-p.fixtures.ts');
+      const sandbox = await buildContext({ srcDir: dir, fixturesFile });
+      const results = sandbox.UrlFetchApp.fetchAll(['https://a.com', 'https://b.com']);
+      expect(results.map((r: { getContentText(): string }) => r.getContentText())).toEqual([
+        'fixture:https://a.com',
+        'fixture:https://b.com',
+      ]);
+      expect(mockExecFileSync).not.toHaveBeenCalled();
+    });
+
     it('reads gas-p.fixtures.ts fresh on every buildContext call — editing it between calls changes the next answer', async () => {
       const dir = join(FIXTURES, 'counter');
       const scratchDir = mkdtempSync(join(tmpdir(), 'gas-p-fixtures-'));

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { loadConfigFromFile } from 'vite';
 import type { SpreadsheetApp } from '../shims/SpreadsheetApp.js';
+import type { UrlFetchApp } from '../shims/UrlFetchApp.js';
 import type { FormApp } from '../shims/FormApp.js';
 import type { GmailApp } from '../shims/GmailApp.js';
 import type { DriveApp } from '../shims/DriveApp.js';
@@ -32,13 +33,13 @@ import type { BigQuery } from '../shims/BigQuery.js';
 import type { Drive } from '../shims/Drive.js';
 
 // The STATIC_SERVICES entries eligible for Declared Fixtures (context.ts's
-// FIXTURE_EXCLUDED_STATIC_SERVICES excludes Utilities/CacheService/
-// UrlFetchApp/Logger), plus CalendarApp/Session (fixtureEligible in
-// CONFIGURED_SERVICES). Kept in sync with those lists by hand — this is a
-// type import for name/method-checking gas-p.fixtures.ts only, not a runtime
-// source of truth.
+// FIXTURE_EXCLUDED_STATIC_SERVICES excludes only Utilities/CacheService/
+// Logger), plus CalendarApp/Session (fixtureEligible in CONFIGURED_SERVICES).
+// Kept in sync with those lists by hand — this is a type import for name/
+// method-checking gas-p.fixtures.ts only, not a runtime source of truth.
 interface EligibleServiceInstances {
   SpreadsheetApp: typeof SpreadsheetApp;
+  UrlFetchApp: typeof UrlFetchApp;
   CalendarApp: InstanceType<typeof CalendarApp>;
   Session: InstanceType<typeof Session>;
   FormApp: typeof FormApp;

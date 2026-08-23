@@ -165,7 +165,7 @@ Each top-level key is a fixture-eligible GAS service name; each method's value i
 
 Fixtures aren't limited to the handful of services in [Services implemented](#services-implemented) below — they apply to any fixture-eligible service, including stub-only ones like `SpreadsheetApp` or `GmailApp` that otherwise throw `GasPNotImplementedError` for every method. That makes fixtures the way to unblock development against a service gas-p hasn't built a real shim for yet, not just an override for `CalendarApp`/`Session`.
 
-Not fixture-eligible: `Utilities`, `CacheService`, `UrlFetchApp`, `Logger`, `HtmlService`, `PropertiesService` — these are already fully local, so there's nothing for a fixture to stand in for.
+Not fixture-eligible: `Utilities`, `CacheService`, `Logger`, `HtmlService`, `PropertiesService` — these are already fully local, so there's nothing for a fixture to stand in for.
 
 ### CLI
 
