@@ -47,11 +47,12 @@ import type { GoogleCredentials } from './credentials.js';
 
 // Already-instantiated singletons with no per-request construction — safe to
 // assign onto every sandbox unconditionally. Real implementations (Utilities,
-// CacheService, UrlFetchApp, Logger) and not-yet-implemented stub-only
-// services (everything else here) both fit this shape today; a stub-only
-// entry moves out of this object and into CONFIGURED_SERVICES below only if
-// its real implementation later needs config the shim module can't see on
-// its own (credentials, srcDir, ...).
+// CacheService, UrlFetchApp, Logger — see FIXTURE_EXCLUDED_STATIC_SERVICES
+// below for which of these are actually fixture-eligible) and not-yet-
+// implemented stub-only services (everything else here) both fit this shape
+// today; a stub-only entry moves out of this object and into
+// CONFIGURED_SERVICES below only if its real implementation later needs
+// config the shim module can't see on its own (credentials, srcDir, ...).
 const STATIC_SERVICES: Record<string, unknown> = {
   Utilities,
   CacheService,
@@ -84,7 +85,10 @@ const STATIC_SERVICES: Record<string, unknown> = {
 
 // Fully-local/real STATIC_SERVICES entries — Declared Fixtures never wrap
 // these, even if a consumer mistakenly declares one, per #38's scope.
-const FIXTURE_EXCLUDED_STATIC_SERVICES = new Set(['Utilities', 'CacheService', 'UrlFetchApp', 'Logger']);
+// UrlFetchApp is deliberately not here (#55): it makes a real external HTTP
+// call via a subprocess bridge, the same kind of thing CalendarApp's real
+// Google API call is, not a local/deterministic service like the three below.
+const FIXTURE_EXCLUDED_STATIC_SERVICES = new Set(['Utilities', 'CacheService', 'Logger']);
 
 interface SandboxBuildParams {
   srcDir: string;
