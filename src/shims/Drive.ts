@@ -18,33 +18,44 @@ import { DriveTeamdrivesStubs } from './generated/DriveTeamdrives.stubs.js';
 // Live-mode Google API bridging: every method throws GasPNotImplementedError
 // until a matching Declared Fixture answers it. Distinct from the basic
 // DriveApp — same relationship as CalendarApp/Calendar (see README).
+//
+// Comments/Permissions/Revisions nest under Files, and Replies nests one
+// further under Comments, matching the real Drive REST API's
+// files.comments.replies resource shape (see #54) — same two-levels-deep
+// composition as People's ContactGroups.Members/People.Connections.
 class DriveAbout extends DriveAboutStubs {}
 class DriveApps extends DriveAppsStubs {}
 class DriveChanges extends DriveChangesStubs {}
 class DriveChannels extends DriveChannelsStubs {}
-class DriveComments extends DriveCommentsStubs {}
 class DriveDrives extends DriveDrivesStubs {}
-class DriveFiles extends DriveFilesStubs {}
 class DriveOperation extends DriveOperationStubs {}
 class DriveOperations extends DriveOperationsStubs {}
-class DrivePermissions extends DrivePermissionsStubs {}
-class DriveReplies extends DriveRepliesStubs {}
-class DriveRevisions extends DriveRevisionsStubs {}
 class DriveTeamdrives extends DriveTeamdrivesStubs {}
+
+class DriveReplies extends DriveRepliesStubs {}
+
+class DriveComments extends DriveCommentsStubs {
+  Replies = new DriveReplies();
+}
+
+class DrivePermissions extends DrivePermissionsStubs {}
+class DriveRevisions extends DriveRevisionsStubs {}
+
+class DriveFiles extends DriveFilesStubs {
+  Comments = new DriveComments();
+  Permissions = new DrivePermissions();
+  Revisions = new DriveRevisions();
+}
 
 class Drive extends DriveStubs {
   About = new DriveAbout();
   Apps = new DriveApps();
   Changes = new DriveChanges();
   Channels = new DriveChannels();
-  Comments = new DriveComments();
   Drives = new DriveDrives();
   Files = new DriveFiles();
   Operation = new DriveOperation();
   Operations = new DriveOperations();
-  Permissions = new DrivePermissions();
-  Replies = new DriveReplies();
-  Revisions = new DriveRevisions();
   Teamdrives = new DriveTeamdrives();
 }
 
