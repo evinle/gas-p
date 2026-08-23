@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GasPNotImplementedError, GasPMissingCredentialsError } from '../errors.js';
+import { GasPNotImplementedError, GasPMissingCredentialsError, GasPFakeNotImplementedError } from '../errors.js';
 
 describe('GasPNotImplementedError', () => {
   it('message matches the required format including the issues link', () => {
@@ -11,6 +11,21 @@ describe('GasPNotImplementedError', () => {
 
   it('is an instance of Error', () => {
     expect(new GasPNotImplementedError('Logger', 'log')).toBeInstanceOf(Error);
+  });
+});
+
+describe('GasPFakeNotImplementedError', () => {
+  it('message names the service/method and points at adding fake logic', () => {
+    const err = new GasPFakeNotImplementedError('DriveApp', 'createFile');
+    expect(err.message).toContain('DriveApp.createFile()');
+    expect(err.message).toMatch(/fake/i);
+  });
+
+  it('is an instance of Error, distinct from GasPNotImplementedError', () => {
+    const err = new GasPFakeNotImplementedError('DriveApp', 'createFile');
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(GasPNotImplementedError);
+    expect(err.name).toBe('GasPFakeNotImplementedError');
   });
 });
 

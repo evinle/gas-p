@@ -7,6 +7,15 @@ export class GasPNotImplementedError extends Error {
   }
 }
 
+export class GasPFakeNotImplementedError extends Error {
+  constructor(service: string, method: string) {
+    super(
+      `${service}.${method}() has no fake implementation yet in gas-p. 👉 Add fake logic for it: https://github.com/evinle/gas-p/issues`
+    );
+    this.name = 'GasPFakeNotImplementedError';
+  }
+}
+
 export class GasPMissingCredentialsError extends Error {
   constructor(service: string, method: string) {
     super(
