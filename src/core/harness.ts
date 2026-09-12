@@ -52,7 +52,9 @@ function injectHeadTags(html: string, output: HtmlOutput): string {
   }
   if (tags.length === 0) return html;
 
-  const headMatch = /<head[^>]*>/i.exec(html);
+  // Lookahead requires the char right after "head" to be whitespace or ">",
+  // otherwise "[^>]*" happily matches into tags like <header> too.
+  const headMatch = /<head(?=[\s>])[^>]*>/i.exec(html);
   if (!headMatch) {
     return `<head>${tags.join('')}</head>${html}`;
   }
