@@ -51,6 +51,13 @@ describe('renderDoGet', () => {
     expect(html).toBe('<head><meta name="viewport" content="width=device-width"/></head><p>hi</p>');
   });
 
+  it('does not mistake a <header> element for <head> when there is no real <head> tag', async () => {
+    const html = await renderDoGet({ srcDir: join(FIXTURES, 'meta-favicon-no-head-with-header') });
+    expect(html).toBe(
+      '<head><meta name="viewport" content="width=device-width"/></head><body><header class="site-header">Nav</header><p>hi</p></body>'
+    );
+  });
+
   it('does not persist module-level state across separate renderDoGet calls', async () => {
     const counterDir = join(FIXTURES, 'counter');
     const first = await renderDoGet({ srcDir: counterDir });
